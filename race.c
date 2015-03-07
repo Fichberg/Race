@@ -7,21 +7,42 @@
 #define MINIMUM_METERS   249
 #define EXPECTED_ARGS    4
 
-char input_checker(int, char **);
+int input_checker(int, char **);
+int get_mode(char **);
 
 int main(int argc, char **argv)
 {
+   int max_cyclists;
    char mode;
 
-   mode = input_checker(argc, argv);
+   max_cyclists = input_checker(argc, argv);
+   mode = get_mode(argv);
 
    /*Now the program must run the selected mode*/
+   if(mode == 'u' || mode == 'U')
+   {
+      /*do_uniform*/
+   }
+   else
+   {
+      /*do_not_uniform*/
+   }
 
    return 0;
 }
 
-/*Checks input and returns the selected mode*/
-char input_checker(int argc, char **argv)
+/*Gets the selected mode for the simulation*/
+int get_mode(char **argv)
+{
+   if(strcasecmp(argv[3], "u") != 0 && strcasecmp(argv[3], "v") != 0) {
+      printf("Mode argument is expected to be 'u' or 'v'.\n");
+      exit(-1);
+   }
+   return *argv[3];
+}
+
+/*Checks input and returns the starting number of cyclists*/
+int input_checker(int argc, char **argv)
 {
    if(argc != EXPECTED_ARGS) {
       printf("The format entrance entrance is d n [v|u].\n");
@@ -38,10 +59,6 @@ char input_checker(int argc, char **argv)
       exit(-1);
    }
 
-   if(strcasecmp(argv[3], "u") != 0 && strcasecmp(argv[3], "v") != 0) {
-      printf("Mode argument is expected to be 'u' or 'v'.\n");
-      exit(-1);
-   }
-      
-   return *argv[3];
+   if(atoi(argv[1]) % 2 == 0) return atoi(argv[1]) / 2;
+   return (atoi(argv[1]) / 2) + 1;
 }

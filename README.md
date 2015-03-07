@@ -1,1 +1,3 @@
-# A race simulator for IME-USP Concurrent Programming's course
+# Race
+
+A race simulator for IME-USP Concurrent Programming's course

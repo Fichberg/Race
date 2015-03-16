@@ -11,7 +11,7 @@
 int input_checker(int, char **);
 int get_mode(char **);
 int *initial_configuration(int);
-int set_cyclists(int *, int, int, int);
+int set_cyclists(int *, int, int, int, int);
 
 int main(int argc, char **argv)
 {
@@ -45,16 +45,16 @@ int *initial_configuration(int max_cyclists)
 
    initial_config = malloc( max_cyclists * sizeof(int) );
    srand(time(NULL));
-   set_cyclists(initial_config, 0, 0, max_cyclists);
+   set_cyclists(initial_config, 0, 0, max_cyclists, max_cyclists);
 
    return initial_config;
 }
 
 /*Organize the cyclists by their number in a random order*/
-int set_cyclists(int *initial_config, int pos, int p, int r)
+int set_cyclists(int *initial_config, int pos, int p, int r, int max)
 {
    int q;
-
+  
    if(p == 0) {
       if(r != 0) q = (rand() % r);
       else q = r;  
@@ -63,12 +63,12 @@ int set_cyclists(int *initial_config, int pos, int p, int r)
       if(p != r) q = p + (rand() % (r - p));
       else q = r;
    } 
-
+   
    if(q <= r && p <= q)
    {
-      initial_config[pos++] = q + 1;
-      pos = set_cyclists(initial_config, pos, p, q - 1);
-      pos = set_cyclists(initial_config, pos, q + 1, r);
+      if(pos < max) initial_config[pos++] = q + 1;
+      pos = set_cyclists(initial_config, pos, p, q - 1, max);
+      pos = set_cyclists(initial_config, pos, q + 1, r, max);
 
    }
    return pos;

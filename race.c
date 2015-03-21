@@ -8,34 +8,80 @@
 #define MINIMUM_METERS   249
 #define EXPECTED_ARGS    4
 
+/*struct containing the attributes of a cyclist*/
+typedef struct cyclist { 
+   int number;
+   int position; 
+   int speed; 
+   int lap;
+} Cyclist;
+
+/*Global variable. Contains the number of cyclists that are still competing*/
+int cyclists_competing;
+/*TODO: Global variable representing the track*/
+
+
+/*Functions declarations*/
 int input_checker(int, char **);
 int get_mode(char **);
 int *initial_configuration(int);
-int set_cyclists(int *, int, int, int, int);
+int set_cyclists(int *, int, int, int);
+void make_cyclists(Cyclist*, int*, int, int);
+
+/*Test functions. TODO: delete these when done*/
+void print_cyclist(Cyclist);
 
 int main(int argc, char **argv)
 {
-   int max_cyclists, *initial_config;
    char mode;
+   int cyclists, *initial_config;
+   /*threads array. Each cyclist is a thread*/
+   pthread_t *my_threads;
+   /*Thread arguments is the cyclist struct*/
+   Cyclist *thread_args;
 
    /*Get initial information to feed the program*/
-   max_cyclists = input_checker(argc, argv);
+   cyclists_competing = cyclists = input_checker(argc, argv);
    mode = get_mode(argv);
 
-   /*Starting order of the cyclists is in the array initial_config[0...max_cyclists-1]. Each cyclist is recognized by its number*/
-   initial_config = initial_configuration(max_cyclists);
+   /*Starting order of the cyclists is in the array initial_config[0...cyclists-1]. Each cyclist is recognized by its unique number*/
+   initial_config = initial_configuration(cyclists);
+
+   /*Threads (cyclists).*/
+   my_threads = malloc(cyclists * sizeof(*my_threads));
+   /*Thread args (cyclist structs)*/
+   thread_args = malloc(cyclists * sizeof(Cyclist));
 
    /*Now the program must run the selected mode*/
    if(mode == 'u' || mode == 'U')
    {
+      make_cyclists(thread_args, initial_config, 50, cyclists);
       /*do_uniform*/
    }
    else
    {
+      make_cyclists(thread_args, initial_config, 25, cyclists);
       /*do_not_uniform*/
    }
 
+
+   free(initial_config);
+   free(my_threads);
+   free(thread_args);
    return 0;
+}
+
+/*Add all the attributes to the cyclists.*/
+void make_cyclists(Cyclist *thread_args, int *initial_config, int initial_speed, int cyclists)
+{
+   int i;
+   for(i = 0; i < cyclists; i++)
+   {
+      thread_args[i].number = initial_config[i];
+      thread_args[i].position = i;
+      thread_args[i].speed = initial_speed;
+      thread_args[i].lap = 1; /*first lap*/
+   }
 }
 
 /*Returns an array with the competitors configured in an aleatory order*/
@@ -45,16 +91,16 @@ int *initial_configuration(int max_cyclists)
 
    initial_config = malloc( max_cyclists * sizeof(int) );
    srand(time(NULL));
-   set_cyclists(initial_config, 0, 0, max_cyclists, max_cyclists);
+   set_cyclists(initial_config, 0, 0, max_cyclists);
 
    return initial_config;
 }
 
 /*Organize the cyclists by their number in a random order*/
-int set_cyclists(int *initial_config, int pos, int p, int r, int max)
+int set_cyclists(int *initial_config, int pos, int p, int r)
 {
    int q;
-  
+
    if(p == 0) {
       if(r != 0) q = (rand() % r);
       else q = r;  
@@ -63,12 +109,12 @@ int set_cyclists(int *initial_config, int pos, int p, int r, int max)
       if(p != r) q = p + (rand() % (r - p));
       else q = r;
    } 
-   
+
    if(q <= r && p <= q)
    {
-      if(pos < max) initial_config[pos++] = q + 1;
-      pos = set_cyclists(initial_config, pos, p, q - 1, max);
-      pos = set_cyclists(initial_config, pos, q + 1, r, max);
+      initial_config[pos++] = q + 1;
+      pos = set_cyclists(initial_config, pos, p, q - 1);
+      pos = set_cyclists(initial_config, pos, q + 1, r);
 
    }
    return pos;
@@ -109,4 +155,14 @@ int input_checker(int argc, char **argv)
 
    if(atoi(argv[2]) < max_cyclists) return atoi(argv[2]);
    return max_cyclists;
+}
+
+
+/*All the functions below this line are here for debugging purposes. TODO: delete these when done.*/
+void print_cyclist(Cyclist cyclist)
+{
+   printf("Cyclist number = %d\n", cyclist.number);
+   printf("Cyclist position = %d\n", cyclist.position);
+   printf("Cyclist speed = %d\n", cyclist.speed);
+   printf("Cyclist lap = %d\n\n", cyclist.lap);
 }

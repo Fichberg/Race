@@ -23,10 +23,14 @@ int cyclists_competing;
 
 /*Functions declarations*/
 int input_checker(int, char **);
-int get_mode(char **);
+char get_mode(char **);
 int *initial_configuration(int);
 int set_cyclists(int *, int, int, int);
 void make_cyclists(Cyclist*, int*, int, int);
+void create_threads(int, char, pthread_t*, Cyclist*);
+void join_threads(int, pthread_t*);
+void *omnium_u(void*);
+void *omnium_v(void*);
 
 /*Test functions. TODO: delete these when done*/
 void print_cyclist(Cyclist);
@@ -53,22 +57,84 @@ int main(int argc, char **argv)
    thread_args = malloc(cyclists * sizeof(Cyclist));
 
    /*Now the program must run the selected mode*/
-   if(mode == 'u' || mode == 'U')
+   if(mode == 'u')
    {
       make_cyclists(thread_args, initial_config, 50, cyclists);
-      /*do_uniform*/
+      create_threads(cyclists, mode, my_threads, thread_args);
    }
    else
    {
       make_cyclists(thread_args, initial_config, 25, cyclists);
-      /*do_not_uniform*/
+      create_threads(cyclists, mode, my_threads, thread_args);
    }
 
-
+   join_threads(cyclists, my_threads);
    free(initial_config);
    free(my_threads);
    free(thread_args);
    return 0;
+}
+
+/*Omnium race function in 'u' mode*/
+void *omnium_u(void *args)
+{
+   Cyclist cyclist = *((Cyclist*) args);
+
+   print_cyclist(cyclist);
+
+   return NULL;
+}
+
+/*Omnium race function in 'v' mode*/
+void *omnium_v(void *args)
+{
+   Cyclist cyclist = *((Cyclist*) args);
+
+   print_cyclist(cyclist);
+
+   return NULL;
+}
+
+/*Function to create all threads*/
+void create_threads(int cyclists, char mode, pthread_t *my_threads, Cyclist *thread_args)
+{
+   int i;
+   if(mode == 'u')
+   {
+      for(i = 0; i < cyclists; i++)
+      {
+         if (pthread_create(&my_threads[i], NULL, omnium_u, &thread_args[i])) 
+         {
+            printf("Error creating thread.");
+            abort();
+         }
+      }  
+   }
+   else
+   {
+      for(i = 0; i < cyclists; i++)
+      {
+         if (pthread_create(&my_threads[i], NULL, omnium_v, &thread_args[i])) 
+         {
+            printf("Error creating thread.");
+            abort();
+         }
+      }
+   }
+}
+
+/*Function to join all threads*/
+void join_threads(int cyclists, pthread_t *my_threads)
+{
+   int i;
+   for(i = 0; i < cyclists; i++)
+   {
+     if (pthread_join(my_threads[i], NULL)) 
+     {
+        printf("Error joining thread.");
+        abort();
+     }
+   }
 }
 
 /*Add all the attributes to the cyclists.*/
@@ -121,13 +187,14 @@ int set_cyclists(int *initial_config, int pos, int p, int r)
 }
 
 /*Gets the selected mode for the simulation*/
-int get_mode(char **argv)
+char get_mode(char **argv)
 {
    if(strcasecmp(argv[3], "u") != 0 && strcasecmp(argv[3], "v") != 0) {
       printf("Mode argument is expected to be 'u' or 'v'.\n");
       exit(-1);
    }
-   return *argv[3];
+   if(strcasecmp(argv[3], "u") == 0) return 'u';
+   return 'v';
 }
 
 /*Checks input and returns the starting number of cyclists*/

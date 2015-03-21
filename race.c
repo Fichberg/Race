@@ -7,6 +7,8 @@
 #define MINIMUM_CYCLISTS 3
 #define MINIMUM_METERS   249
 #define EXPECTED_ARGS    4
+#define NOT_BROKEN       0
+#define BROKEN           1
 
 /*struct containing the attributes of a cyclist*/
 typedef struct cyclist { 
@@ -233,3 +235,72 @@ void print_cyclist(Cyclist cyclist)
    printf("Cyclist speed = %d\n", cyclist.speed);
    printf("Cyclist lap = %d\n\n", cyclist.lap);
 }
+
+
+/*
+TODO:
+
+----------------------------------------------------
+1)
+typedef struck meter { 
+   Cyclist cyclist1; 
+   Cyclist cyclist2; 
+   Cyclist cyclist3; 
+   Cyclist cyclist4; 
+   int cyclists; 
+}
+
+typedef *meter Track;
+
+int cyclists da struct meter vale de
+
+0 <= int cyclists <= 4
+-----------------------------------------------------
+2)
+Thread para controlar o tempo, junto com uma variável global time.
+Sempre que time for múltiplo de 72ms, as informações da pista são impressas (não sei se na tela ou em arquivo. A ver)
+-----------------------------------------------------
+3)
+Sempre que o lap de um ciclista for
+
+lap % 4 == 1
+
+Ele tem 1% de chance de quebrar (isso pq o lap começa no 1)
+
+OBS: QUANDO SOBRAREM TRES CICLISTAS NA PISTA NÃO EXISTE MAIS A CHANCE DE QUEBRAR!!!!!!!!!!!!!!
+-----------------------------------------------------
+4)
+Ciclistas quebrados ou eliminados tem a sua thread destruída!
+-----------------------------------------------------
+5) (Provavelmente está será a última coisa que faremos)
+MODO DEBUG:
+Seu programa deve ainda permitir uma opcao de debug na qual a cada 14,4 segundos deve ser exibido na tela a volta em que
+cada ciclista está e a posicao dele naquela volta atual.
+------------------------------------------------------
+6)
+LER SAÍDA NO ENUNCIADO
+------------------------------------------------------
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+*/

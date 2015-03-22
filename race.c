@@ -146,7 +146,7 @@ void countdown()
    }
    sleep(1);
    printf("\nGO!\n");
-   go = 1;
+   go = START;
 }
 
 /*Function to join the time thread*/

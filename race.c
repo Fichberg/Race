@@ -1,3 +1,5 @@
+#define _XOPEN_SOURCE 500 /*To compile without nanosleep implicit declaration warning*/
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -23,11 +25,15 @@ typedef struct cyclist {
 /*Global variable. Contains the number of cyclists that are still competing*/
 int cyclists_competing;
 /*Global variable. Contains the race time duration*/
-clock_t elapsed_time;
+double elapsed_time;
 /*TODO: Global variable representing the track*/
 
 /*Global. Says if the race has started*/
 int go;
+
+pthread_mutex_t fakeMutex = PTHREAD_MUTEX_INITIALIZER;
+pthread_cond_t fakeCond = PTHREAD_COND_INITIALIZER;
+
 
 /*Functions declarations*/
 int input_checker(int, char **);
@@ -62,9 +68,6 @@ int main(int argc, char **argv)
    cyclists_competing = cyclists = input_checker(argc, argv);
    mode = get_mode(argv);
 
-   /*Sets go to false. Cyclists can't start unless go is true*/
-   go = 0;
-
    /*Starting order of the cyclists is in the array initial_config[0...cyclists-1]. Each cyclist is recognized by its unique number*/
    initial_config = initial_configuration(cyclists);
 
@@ -72,6 +75,9 @@ int main(int argc, char **argv)
    my_threads = malloc(cyclists * sizeof(*my_threads));
    /*Thread args (cyclist structs)*/
    thread_args = malloc(cyclists * sizeof(Cyclist));
+
+   /*Sets go to false. Cyclists can't start unless go is true*/
+   go = 0;
 
    /*Now the program must run the selected mode*/
    if(mode == 'u')
@@ -111,6 +117,7 @@ void *omnium_u(void *args)
 
    print_cyclist(cyclist);
 
+   while(cyclists_competing != 1) continue;
 
    return NULL;
 }
@@ -124,13 +131,37 @@ void *omnium_v(void *args)
 
    print_cyclist(cyclist);
 
+   while(cyclists_competing != 1) continue;
+
    return NULL;
 }
 
 /*Runs the chronometer*/
 void *omnium_chronometer(void *args)
 {
+   double milliseconds_adder = 0.072;
+   struct timespec tim, tim2;
+   tim.tv_sec = tim2.tv_sec = 0;
+   tim.tv_nsec = tim2.tv_nsec = 72000000; /*72ms*/
+
+   /*Race will start. After countdown(), all cyclist threads will be unlocked.*/
    countdown();
+   
+   /*Race chronometer*/
+   elapsed_time = 0;
+   
+   /*Time thread will run until we have just 1 cyclist competing*/
+   while(cyclists_competing != 1)
+   {
+      if (nanosleep(&tim , &tim2) < 0)
+      {
+         printf("Nanosleep failed.\n");
+         exit(-1);
+      }
+      elapsed_time += milliseconds_adder;
+      printf("Elapsed time: %.3f\n",  elapsed_time);
+   }
+
 
    return NULL;
 }
@@ -348,6 +379,8 @@ LER SAÍDA NO ENUNCIADO
 
 
 
+Informações relatório:
+O programa foi testado com n <= 380. Acima disso, provavelmente você pode receber core dumped
 
 
 
@@ -357,9 +390,10 @@ LER SAÍDA NO ENUNCIADO
 
 
 
+tempo:
 
 
-
+http://stackoverflow.com/questions/1486833/pthread-cond-timedwait-help
 
 
 

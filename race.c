@@ -211,6 +211,7 @@ void *omnium_chronometer(void *args)
    return NULL;
 }
 
+/*Countdown for race start. While the countdown is running, cyclists threads are being created.*/
 void countdown()
 {
    int i;
@@ -407,9 +408,6 @@ void print_track()
 
 /*
 TODO:
-2)
-Thread para controlar o tempo, junto com uma variável global time.
-Sempre que time for múltiplo de 72ms, as informações da pista são impressas (não sei se na tela ou em arquivo. A ver)
 -----------------------------------------------------
 3)
 Sempre que o lap de um ciclista for
@@ -433,6 +431,9 @@ LER SAÍDA NO ENUNCIADO
 ------------------------------------------------------
 
 
+
+QUESTOES:
+As informações de print_track() precisam mesmo ser printadas no terminal ou em um arquivo de saída?
 
 
 

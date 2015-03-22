@@ -10,9 +10,10 @@
 #define MINIMUM_CYCLISTS 3
 #define MINIMUM_METERS   249
 #define EXPECTED_ARGS    4
+#define START            1
+#define MAX_CYCLISTS     4
 #define NOT_BROKEN       0
 #define BROKEN           1
-#define START            1
 
 /*struct containing the attributes of a cyclist*/
 typedef struct cyclist { 
@@ -22,13 +23,25 @@ typedef struct cyclist {
    int lap;
 } Cyclist;
 
+typedef struct meter { 
+   Cyclist* cyclist1; 
+   Cyclist* cyclist2; 
+   Cyclist* cyclist3; 
+   Cyclist* cyclist4; 
+   int cyclists; 
+} Meter;
+
+typedef Meter* Track;
+
 /*Global variable. Contains the number of cyclists that are still competing*/
 int cyclists_competing;
 /*Global variable. Contains the race time duration*/
 double elapsed_time;
-/*TODO: Global variable representing the track*/
-
-/*Global. Says if the race has started*/
+/*Global variable. Represents the track*/
+Track track;
+/*Global variable. Contains the size of the track. It is an array of Meter with size [0...track_size-1]*/
+int track_size;
+/*Global variable. Says if the race has started*/
 int go;
 
 pthread_mutex_t fakeMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -49,9 +62,11 @@ void create_time_thread(pthread_t);
 void join_time_thread(pthread_t);
 void *omnium_chronometer(void*);
 void countdown();
+void make_track();
 
 /*Test functions. TODO: delete these when done*/
 void print_cyclist(Cyclist);
+void print_track();
 
 int main(int argc, char **argv)
 {
@@ -79,6 +94,12 @@ int main(int argc, char **argv)
    /*Sets go to false. Cyclists can't start unless go is true*/
    go = 0;
 
+   /*Sets the size of the track*/
+   track_size = atoi(argv[1]);
+
+   /*Allocates the track*/
+   make_track();
+
    /*Now the program must run the selected mode*/
    if(mode == 'u')
    {
@@ -105,7 +126,23 @@ int main(int argc, char **argv)
    free(initial_config);
    free(my_threads);
    free(thread_args);
+   free(track);
    return 0;
+}
+
+/*Allocates the track*/
+void make_track()
+{
+   int i;
+   track = malloc(track_size * sizeof(Meter));
+   for(i = 0; i < track_size; i++)
+   {
+      track[i].cyclist1 = NULL;
+      track[i].cyclist2 = NULL;
+      track[i].cyclist3 = NULL;
+      track[i].cyclist4 = NULL;
+      track[i].cyclists = 0;
+   }
 }
 
 /*Omnium race function in 'u' mode*/
@@ -115,7 +152,7 @@ void *omnium_u(void *args)
 
    while(!go) continue;
 
-   print_cyclist(cyclist);
+   /*print_cyclist(cyclist);*/
 
    while(cyclists_competing != 1) continue;
 
@@ -129,7 +166,7 @@ void *omnium_v(void *args)
 
    while(!go) continue;
 
-   print_cyclist(cyclist);
+   /*print_cyclist(cyclist);*/
 
    while(cyclists_competing != 1) continue;
 
@@ -303,7 +340,7 @@ int input_checker(int argc, char **argv)
    }
 
    if(atoi(argv[1]) <= MINIMUM_METERS) {
-      printf("The track is expected to have more than 249m (found \"%s\").\n", argv[1]);
+      printf("The track is expected to have more than 249m (found \"%sm\").\n", argv[1]);
       exit(-1);
    }
 
@@ -329,6 +366,21 @@ void print_cyclist(Cyclist cyclist)
    printf("Cyclist lap = %d\n\n", cyclist.lap);
 }
 
+/**/
+void print_track()
+{
+   int i;
+   printf("Track configuration:\n\n");
+   for(i = 0; i < track_size; i++)
+   {
+      printf("Track position (array index + 1): %d\n", i + 1);
+      printf("Cyclist1 = %p\n", (void*)track[i].cyclist1);
+      printf("Cyclist2 = %p\n", (void*)track[i].cyclist2);
+      printf("Cyclist3 = %p\n", (void*)track[i].cyclist3);
+      printf("Cyclist4 = %p\n", (void*)track[i].cyclist4);
+      printf("Cyclists in this position: = %d\n\n", track[i].cyclists);
+   }
+}
 
 /*
 TODO:

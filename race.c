@@ -3,12 +3,14 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <time.h>
+#include <unistd.h>
 
 #define MINIMUM_CYCLISTS 3
 #define MINIMUM_METERS   249
 #define EXPECTED_ARGS    4
 #define NOT_BROKEN       0
 #define BROKEN           1
+#define START            1
 
 /*struct containing the attributes of a cyclist*/
 typedef struct cyclist { 
@@ -20,8 +22,12 @@ typedef struct cyclist {
 
 /*Global variable. Contains the number of cyclists that are still competing*/
 int cyclists_competing;
+/*Global variable. Contains the race time duration*/
+clock_t elapsed_time;
 /*TODO: Global variable representing the track*/
 
+/*Global. Says if the race has started*/
+int go;
 
 /*Functions declarations*/
 int input_checker(int, char **);
@@ -33,6 +39,10 @@ void create_threads(int, char, pthread_t*, Cyclist*);
 void join_threads(int, pthread_t*);
 void *omnium_u(void*);
 void *omnium_v(void*);
+void create_time_thread(pthread_t);
+void join_time_thread(pthread_t);
+void *omnium_chronometer(void*);
+void countdown();
 
 /*Test functions. TODO: delete these when done*/
 void print_cyclist(Cyclist);
@@ -41,14 +51,19 @@ int main(int argc, char **argv)
 {
    char mode;
    int cyclists, *initial_config;
-   /*threads array. Each cyclist is a thread*/
+   /*threads array. Each cyclist is a thread.*/
    pthread_t *my_threads;
+   /*thread in charge of the time elapsed in the simulation*/
+   pthread_t time_thread;
    /*Thread arguments is the cyclist struct*/
    Cyclist *thread_args;
 
    /*Get initial information to feed the program*/
    cyclists_competing = cyclists = input_checker(argc, argv);
    mode = get_mode(argv);
+
+   /*Sets go to false. Cyclists can't start unless go is true*/
+   go = 0;
 
    /*Starting order of the cyclists is in the array initial_config[0...cyclists-1]. Each cyclist is recognized by its unique number*/
    initial_config = initial_configuration(cyclists);
@@ -63,11 +78,21 @@ int main(int argc, char **argv)
    {
       make_cyclists(thread_args, initial_config, 50, cyclists);
       create_threads(cyclists, mode, my_threads, thread_args);
+      if (pthread_create(&time_thread, NULL, omnium_chronometer, NULL)) 
+      {
+         printf("Error creating time thread.");
+         abort();
+      }
    }
    else
    {
       make_cyclists(thread_args, initial_config, 25, cyclists);
       create_threads(cyclists, mode, my_threads, thread_args);
+      if (pthread_create(&time_thread, NULL, omnium_chronometer, NULL)) 
+      {
+         printf("Error creating time thread.");
+         abort();
+      }  
    }
 
    join_threads(cyclists, my_threads);
@@ -82,7 +107,10 @@ void *omnium_u(void *args)
 {
    Cyclist cyclist = *((Cyclist*) args);
 
+   while(go == 0) continue;
+
    print_cyclist(cyclist);
+
 
    return NULL;
 }
@@ -92,12 +120,46 @@ void *omnium_v(void *args)
 {
    Cyclist cyclist = *((Cyclist*) args);
 
+   while(go == 0) continue;
+
    print_cyclist(cyclist);
 
    return NULL;
 }
 
-/*Function to create all threads*/
+/*Runs the chronometer*/
+void *omnium_chronometer(void *args)
+{
+   countdown();
+
+   return NULL;
+}
+
+void countdown()
+{
+   int i;
+   printf("\nOmnium will start in 5 seconds!\n\n");
+   for(i = 5; i >= 2; i--)
+   {
+      sleep(1);
+      printf("%d...\n", i);
+   }
+   sleep(1);
+   printf("\nGO!\n");
+   go = 1;
+}
+
+/*Function to join the time thread*/
+void join_time_thread(pthread_t time_thread)
+{
+  if (pthread_join(time_thread, NULL)) 
+  {
+      printf("Error joining time thread.");
+      abort();
+  }
+}
+
+/*Function to create all Cyclists threads*/
 void create_threads(int cyclists, char mode, pthread_t *my_threads, Cyclist *thread_args)
 {
    int i;

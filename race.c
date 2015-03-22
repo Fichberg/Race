@@ -17,20 +17,22 @@
 
 /*struct containing the attributes of a cyclist*/
 typedef struct cyclist { 
-   int number;
-   int position; 
-   int speed; 
-   int lap;
+   int number;    /*Cyclist number*/
+   int position;  /*Position in the track. [0...track_size-1]*/
+   int speed;     /*Cyclist speed. 25km/h or 50km/h*/
+   int lap;       /*His actual lap*/
 } Cyclist;
 
+/*Each position of the track is a cell of type meter*/
 typedef struct meter { 
    Cyclist* cyclist1; 
    Cyclist* cyclist2; 
    Cyclist* cyclist3; 
    Cyclist* cyclist4; 
-   int cyclists; 
+   int cyclists;  /*Number of cyclists in this position of the track*/
 } Meter;
 
+/*Definition of the track*/
 typedef Meter* Track;
 
 /*Global variable. Contains the number of cyclists that are still competing*/
@@ -43,10 +45,6 @@ Track track;
 int track_size;
 /*Global variable. Says if the race has started*/
 int go;
-
-pthread_mutex_t fakeMutex = PTHREAD_MUTEX_INITIALIZER;
-pthread_cond_t fakeCond = PTHREAD_COND_INITIALIZER;
-
 
 /*Functions declarations*/
 int input_checker(int, char **);
@@ -63,10 +61,11 @@ void join_time_thread(pthread_t);
 void *omnium_chronometer(void*);
 void countdown();
 void make_track();
+void print_track();
+void put_cyclists_in_track(Cyclist*, int);
 
 /*Test functions. TODO: delete these when done*/
 void print_cyclist(Cyclist);
-void print_track();
 
 int main(int argc, char **argv)
 {
@@ -99,11 +98,11 @@ int main(int argc, char **argv)
 
    /*Allocates the track*/
    make_track();
-
    /*Now the program must run the selected mode*/
    if(mode == 'u')
    {
       make_cyclists(thread_args, initial_config, 50, cyclists);
+      put_cyclists_in_track(thread_args, cyclists);
       create_threads(cyclists, mode, my_threads, thread_args);
       if (pthread_create(&time_thread, NULL, omnium_chronometer, NULL)) 
       {
@@ -114,6 +113,7 @@ int main(int argc, char **argv)
    else
    {
       make_cyclists(thread_args, initial_config, 25, cyclists);
+      put_cyclists_in_track(thread_args, cyclists);
       create_threads(cyclists, mode, my_threads, thread_args);
       if (pthread_create(&time_thread, NULL, omnium_chronometer, NULL)) 
       {
@@ -154,7 +154,10 @@ void *omnium_u(void *args)
 
    /*print_cyclist(cyclist);*/
 
-   while(cyclists_competing != 1) continue;
+   while(cyclists_competing != 1) 
+   {
+      continue;
+   }
 
    return NULL;
 }
@@ -164,7 +167,10 @@ void *omnium_v(void *args)
 {
    Cyclist cyclist = *((Cyclist*) args);
 
-   while(!go) continue;
+   while(!go)
+   {
+      continue;
+   }
 
    /*print_cyclist(cyclist);*/
 
@@ -190,6 +196,7 @@ void *omnium_chronometer(void *args)
    /*Time thread will run until we have just 1 cyclist competing*/
    while(cyclists_competing != 1)
    {
+      /*Simulation cycle*/
       if (nanosleep(&tim , &tim2) < 0)
       {
          printf("Nanosleep failed.\n");
@@ -197,6 +204,7 @@ void *omnium_chronometer(void *args)
       }
       elapsed_time += milliseconds_adder;
       printf("Elapsed time: %.3f\n",  elapsed_time);
+      print_track();
    }
 
 
@@ -215,6 +223,16 @@ void countdown()
    sleep(1);
    printf("\nGO!\n");
    go = START;
+}
+
+void put_cyclists_in_track(Cyclist *thread_args, int cyclists)
+{
+   int i;
+   for(i = 0; i < cyclists; i++)
+   {
+      track[i].cyclist1 = &thread_args[i];
+      track[i].cyclists = 1;
+   }
 }
 
 /*Function to join the time thread*/
@@ -366,41 +384,29 @@ void print_cyclist(Cyclist cyclist)
    printf("Cyclist lap = %d\n\n", cyclist.lap);
 }
 
-/**/
+/*Prints the information about the cyclists that are still competing*/
 void print_track()
 {
-   int i;
-   printf("Track configuration:\n\n");
+   int i, c = 0;
+   printf("Track configuration (just positions containing cyclists):\n\n");
    for(i = 0; i < track_size; i++)
    {
+      if(c == cyclists_competing) break;
+      if(track[i].cyclists == 0) continue;
       printf("Track position (array index + 1): %d\n", i + 1);
-      printf("Cyclist1 = %p\n", (void*)track[i].cyclist1);
-      printf("Cyclist2 = %p\n", (void*)track[i].cyclist2);
-      printf("Cyclist3 = %p\n", (void*)track[i].cyclist3);
-      printf("Cyclist4 = %p\n", (void*)track[i].cyclist4);
-      printf("Cyclists in this position: = %d\n\n", track[i].cyclists);
+      printf("Cyclists in this position: = %d\n", track[i].cyclists);
+      if(track[i].cyclists >= 1) { printf("Cyclist number = %d   (%p)\n", (*track[i].cyclist1).number, (void*)track[i].cyclist1); ++c; } 
+      else { printf("\n"); continue; }
+      if(track[i].cyclists >= 2) { printf("Cyclist number = %d   (%p)\n", (*track[i].cyclist2).number, (void*)track[i].cyclist2); ++c; }
+      else { printf("\n"); continue; }
+      if(track[i].cyclists >= 3) { printf("Cyclist number = %d   (%p)\n", (*track[i].cyclist3).number, (void*)track[i].cyclist3); ++c; }
+      else { printf("\n"); continue; }
+      if(track[i].cyclists >= 4) { printf("Cyclist number = %d   (%p)\n\n", (*track[i].cyclist4).number, (void*)track[i].cyclist4); ++c; }
    }
 }
 
 /*
 TODO:
-
-----------------------------------------------------
-1)
-typedef struck meter { 
-   Cyclist cyclist1; 
-   Cyclist cyclist2; 
-   Cyclist cyclist3; 
-   Cyclist cyclist4; 
-   int cyclists; 
-}
-
-typedef *meter Track;
-
-int cyclists da struct meter vale de
-
-0 <= int cyclists <= 4
------------------------------------------------------
 2)
 Thread para controlar o tempo, junto com uma variável global time.
 Sempre que time for múltiplo de 72ms, as informações da pista são impressas (não sei se na tela ou em arquivo. A ver)

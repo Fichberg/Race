@@ -107,7 +107,7 @@ void *omnium_u(void *args)
 {
    Cyclist cyclist = *((Cyclist*) args);
 
-   while(go == 0) continue;
+   while(!go) continue;
 
    print_cyclist(cyclist);
 
@@ -120,7 +120,7 @@ void *omnium_v(void *args)
 {
    Cyclist cyclist = *((Cyclist*) args);
 
-   while(go == 0) continue;
+   while(!go) continue;
 
    print_cyclist(cyclist);
 

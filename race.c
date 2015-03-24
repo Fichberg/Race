@@ -12,15 +12,17 @@
 #define EXPECTED_ARGS    4
 #define START            1
 #define MAX_CYCLISTS     4
-#define NOT_BROKEN       0
-#define BROKEN           1
+#define FALSE            0
+#define TRUE             1
 
 /*struct containing the attributes of a cyclist*/
 typedef struct cyclist { 
    int number;    /*Cyclist number*/
    int position;  /*Position in the track. [0...track_size-1]*/
+   int place;     /*His place of the race (1 for first, 2 for second... cyclist_competing for last (in actual lap))*/
    int speed;     /*Cyclist speed. 25km/h or 50km/h*/
    int lap;       /*His actual lap*/
+   int broken;    /*did he broke?*/
 } Cyclist;
 
 /*Each position of the track is a cell of type meter*/
@@ -38,7 +40,7 @@ typedef Meter* Track;
 /*Global variable. Contains the number of cyclists that are still competing*/
 int cyclists_competing;
 /*Global variable. Contains the race time duration*/
-double elapsed_time;
+int elapsed_time;
 /*Global variable. Represents the track*/
 Track track;
 /*Global variable. Contains the size of the track. It is an array of Meter with size [0...track_size-1]*/
@@ -148,14 +150,19 @@ void make_track()
 /*Omnium race function in 'u' mode*/
 void *omnium_u(void *args)
 {
+   int n = 1;
    Cyclist cyclist = *((Cyclist*) args);
 
    while(!go) continue;
-
    /*print_cyclist(cyclist);*/
 
    while(cyclists_competing != 1) 
    {
+      /*Cyclist can attempt to move in cell in the track array*/
+      if(elapsed_time / 72 == n) {
+         /*do whatever*/
+         ++n; 
+    }
       continue;
    }
 
@@ -179,10 +186,10 @@ void *omnium_v(void *args)
    return NULL;
 }
 
-/*Runs the chronometer*/
+/*Runs the chronometer. The chronometer also prints on the screen the information about the race.*/
 void *omnium_chronometer(void *args)
 {
-   double milliseconds_adder = 0.072;
+   int milliseconds_adder = 72;
    struct timespec tim, tim2;
    tim.tv_sec = tim2.tv_sec = 0;
    tim.tv_nsec = tim2.tv_nsec = 72000000; /*72ms*/
@@ -203,8 +210,8 @@ void *omnium_chronometer(void *args)
          exit(-1);
       }
       elapsed_time += milliseconds_adder;
-      printf("Elapsed time: %.3f\n",  elapsed_time);
       print_track();
+      printf("Elapsed time: %.3f\n-----------------------\n",  elapsed_time / 100.0);
    }
 
 
@@ -296,8 +303,10 @@ void make_cyclists(Cyclist *thread_args, int *initial_config, int initial_speed,
    {
       thread_args[i].number = initial_config[i];
       thread_args[i].position = i;
+      thread_args[i].place = cyclists - i;
       thread_args[i].speed = initial_speed;
       thread_args[i].lap = 1; /*first lap*/
+      thread_args[i].broken = FALSE;
    }
 }
 
@@ -382,7 +391,9 @@ void print_cyclist(Cyclist cyclist)
    printf("Cyclist number = %d\n", cyclist.number);
    printf("Cyclist position = %d\n", cyclist.position);
    printf("Cyclist speed = %d\n", cyclist.speed);
-   printf("Cyclist lap = %d\n\n", cyclist.lap);
+   printf("Cyclist lap = %d\n", cyclist.lap);
+   if(cyclist.broken) printf("Cyclist broken? TRUE\n\n");
+   else printf("Cyclist broken? FALSE\n\n");
 }
 
 /*Prints the information about the cyclists that are still competing*/
@@ -395,14 +406,30 @@ void print_track()
       if(c == cyclists_competing) break;
       if(track[i].cyclists == 0) continue;
       printf("Track position (array index + 1): %d\n", i + 1);
-      printf("Cyclists in this position: = %d\n", track[i].cyclists);
-      if(track[i].cyclists >= 1) { printf("Cyclist number = %d   (%p)\n", (*track[i].cyclist1).number, (void*)track[i].cyclist1); ++c; } 
+      printf("Cyclists in this position: %d\n", track[i].cyclists);
+      if(track[i].cyclists >= 1) { 
+         printf("Cyclist number %d is in %d place.  (%p)\n", (*track[i].cyclist1).number, (*track[i].cyclist1).place, (void*)track[i].cyclist1); 
+         if((*track[i].cyclist1).broken) printf("This cyclist has broken.\n");
+         ++c; 
+      } 
       else { printf("\n"); continue; }
-      if(track[i].cyclists >= 2) { printf("Cyclist number = %d   (%p)\n", (*track[i].cyclist2).number, (void*)track[i].cyclist2); ++c; }
+      if(track[i].cyclists >= 2) { 
+         printf("Cyclist number %d is in %d place.  (%p)\n", (*track[i].cyclist2).number, (*track[i].cyclist1).place, (void*)track[i].cyclist2); 
+         if((*track[i].cyclist2).broken) printf("This cyclist has broken.\n");
+         ++c; 
+      }
       else { printf("\n"); continue; }
-      if(track[i].cyclists >= 3) { printf("Cyclist number = %d   (%p)\n", (*track[i].cyclist3).number, (void*)track[i].cyclist3); ++c; }
+      if(track[i].cyclists >= 3) { 
+         printf("Cyclist number %d is in %d place.  (%p)\n", (*track[i].cyclist3).number, (*track[i].cyclist1).place, (void*)track[i].cyclist3); 
+         if((*track[i].cyclist3).broken) printf("This cyclist has broken.\n");
+         ++c; 
+      }
       else { printf("\n"); continue; }
-      if(track[i].cyclists >= 4) { printf("Cyclist number = %d   (%p)\n\n", (*track[i].cyclist4).number, (void*)track[i].cyclist4); ++c; }
+      if(track[i].cyclists >= 4) { 
+         printf("Cyclist number %d is in %d place.  (%p)\n\n", (*track[i].cyclist4).number, (*track[i].cyclist1).place, (void*)track[i].cyclist4); 
+         if((*track[i].cyclist4).broken) printf("This cyclist has broken.\n");
+         ++c; 
+      }
    }
 }
 
@@ -429,7 +456,8 @@ cada ciclista está e a posicao dele naquela volta atual.
 6)
 LER SAÍDA NO ENUNCIADO
 ------------------------------------------------------
-
+7)
+UM CICLISTA É ELIMINADO QUANDO ELE TEM POSITION == track_size-1 e 
 
 
 QUESTOES:

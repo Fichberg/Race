@@ -12,17 +12,18 @@
 #define EXPECTED_ARGS    4
 #define START            1
 #define MAX_CYCLISTS     4
-#define FALSE            0
-#define TRUE             1
+#define NO_CYCLISTS      0
+#define LOCKED           1
+#define UNLOCKED         0
 
 /*struct containing the attributes of a cyclist*/
 typedef struct cyclist { 
    int number;    /*Cyclist number*/
-   int position;  /*Position in the track. [0...track_size-1]*/
+   int position;  /*Position in the track. [0...track_size-1]. Position is printed as*/
    int place;     /*His place of the race (1 for first, 2 for second... cyclist_competing for last (in actual lap))*/
    int speed;     /*Cyclist speed. 25km/h or 50km/h*/
    int lap;       /*His actual lap*/
-   int broken;    /*did he broke?*/
+   char broken;   /*did he broke?*/
 } Cyclist;
 
 /*Each position of the track is a cell of type meter*/
@@ -47,6 +48,10 @@ Track track;
 int track_size;
 /*Global variable. Says if the race has started*/
 int go;
+/*Global variable. Protexts the writing in track array*/
+pthread_mutex_t lock;
+/*Global variable. All cyclists moved*/
+int moved_cyclists;
 
 /*Functions declarations*/
 int input_checker(int, char **);
@@ -65,6 +70,9 @@ void countdown();
 void make_track();
 void print_track();
 void put_cyclists_in_track(Cyclist*, int);
+void move_cyclist(Cyclist*);
+void semaphore(Cyclist*);
+void await(int);
 
 /*Test functions. TODO: delete these when done*/
 void print_cyclist(Cyclist);
@@ -95,6 +103,19 @@ int main(int argc, char **argv)
    /*Sets go to false. Cyclists can't start unless go is true*/
    go = 0;
 
+   /*Race chronometer*/
+   elapsed_time = 0;
+
+   /*Cyclists made no movement yet*/
+   moved_cyclists = 0;
+
+   /*Lock is initialized*/
+   if (pthread_mutex_init(&lock, NULL) != 0)
+   {
+      printf("\n mutex init failed\n");
+      return 1;
+   }
+
    /*Sets the size of the track*/
    track_size = atoi(argv[1]);
 
@@ -103,9 +124,14 @@ int main(int argc, char **argv)
    /*Now the program must run the selected mode*/
    if(mode == 'u')
    {
+      printf("\nPlacing competitors...\n\n");
+      sleep(1);
       make_cyclists(thread_args, initial_config, 50, cyclists);
       put_cyclists_in_track(thread_args, cyclists);
       create_threads(cyclists, mode, my_threads, thread_args);
+      sleep(1);
+      printf("\nAdjusting chronometer... ");
+      sleep(3);
       if (pthread_create(&time_thread, NULL, omnium_chronometer, NULL)) 
       {
          printf("Error creating time thread.");
@@ -114,9 +140,14 @@ int main(int argc, char **argv)
    }
    else
    {
+      printf("\nPlacing competitors...\n\n");
+      sleep(1);
       make_cyclists(thread_args, initial_config, 25, cyclists);
       put_cyclists_in_track(thread_args, cyclists);
       create_threads(cyclists, mode, my_threads, thread_args);
+      sleep(1);
+      printf("\nAdjusting chronometer...\n\n");
+      sleep(3);
       if (pthread_create(&time_thread, NULL, omnium_chronometer, NULL)) 
       {
          printf("Error creating time thread.");
@@ -129,6 +160,7 @@ int main(int argc, char **argv)
    free(my_threads);
    free(thread_args);
    free(track);
+   pthread_mutex_destroy(&lock);
    return 0;
 }
 
@@ -147,23 +179,71 @@ void make_track()
    }
 }
 
+/*Attempts to move a cyclist*/
+void move_cyclist(Cyclist *cyclist)
+{
+   int next_position = (cyclist->position + 1) % track_size;
+   if(track[next_position].cyclists < 4) 
+   {
+      /*This cyclist forwarded 1 position*/
+      (track[cyclist->position].cyclists)--;
+      (track[next_position].cyclists)++;
+      cyclist->position = next_position;
+
+
+      if((track[cyclist->position].cyclists) > MAX_CYCLISTS) 
+      {
+         printf("\nError. Found more than 4 cyclists in track[%d].\n", cyclist->position);
+         exit(0);
+      }
+      if(cyclist->position - 1 > 0 && ((track[cyclist->position - 1].cyclists) < NO_CYCLISTS)) 
+      {
+         printf("\nError. Found negative number of cyclists in track[%d].\n", cyclist->position - 1);
+         exit(0);
+      }
+      else if(cyclist->position - 1 == 0 && ((track[track_size-1].cyclists) < NO_CYCLISTS)) 
+      {
+         printf("\nError. Found negative number of cyclists in track[%d].\n", track_size - 1);
+         exit(0);
+      }
+
+      if(track[cyclist->position - 1].cyclist1 == cyclist) track[cyclist->position - 1].cyclist1 = NULL;
+      else if(track[cyclist->position - 1].cyclist2 == cyclist) track[cyclist->position - 1].cyclist2 = NULL;
+      else if(track[cyclist->position - 1].cyclist3 == cyclist) track[cyclist->position - 1].cyclist3 = NULL;
+      else track[cyclist->position - 1].cyclist4 = NULL; 
+      
+      if(track[cyclist->position].cyclist1 == NULL) track[cyclist->position].cyclist1 = cyclist;
+      else if(track[cyclist->position].cyclist2 == NULL) track[cyclist->position].cyclist2 = cyclist;
+      else if(track[cyclist->position].cyclist3 == NULL) track[cyclist->position].cyclist3 = cyclist;
+      else track[cyclist->position].cyclist4 = cyclist;
+
+      moved_cyclists++;
+      print_cyclist(*cyclist);
+   }
+}
+
+/*Semaphore*/
+void semaphore(Cyclist *cyclist)
+{
+   pthread_mutex_lock(&lock);
+   move_cyclist(cyclist);
+   pthread_mutex_unlock(&lock);
+}
+
 /*Omnium race function in 'u' mode*/
 void *omnium_u(void *args)
 {
-   int n = 1;
-   Cyclist cyclist = *((Cyclist*) args);
+   Cyclist *cyclist = ((Cyclist*) args);
 
+   print_cyclist(*cyclist);
    while(!go) continue;
-   /*print_cyclist(cyclist);*/
 
    while(cyclists_competing != 1) 
    {
-      /*Cyclist can attempt to move in cell in the track array*/
-      if(elapsed_time / 72 == n) {
-         /*do whatever*/
-         ++n; 
-    }
-      continue;
+      /*Cyclist can attempt to move to next cell in the track array*/
+      semaphore(cyclist);
+      while(moved_cyclists != 0) continue;
+      await(cyclists_competing * 300000);
    }
 
    return NULL;
@@ -172,46 +252,48 @@ void *omnium_u(void *args)
 /*Omnium race function in 'v' mode*/
 void *omnium_v(void *args)
 {
-   Cyclist cyclist = *((Cyclist*) args);
+   int n = 1;
+   Cyclist *cyclist = ((Cyclist*) args);
 
-   while(!go)
-   {
-      continue;
-   }
-
-   /*print_cyclist(cyclist);*/
+   while(!go) continue;
+   print_cyclist(*cyclist);
 
    while(cyclists_competing != 1) continue;
 
    return NULL;
 }
 
+/*Function to wait x ms.*/
+void await(int x)
+{
+   struct timespec tim, tim2;
+   tim.tv_sec = tim2.tv_sec = 0;
+   tim.tv_nsec = tim2.tv_nsec = x; /*72ms*/
+
+   if (nanosleep(&tim , &tim2) < 0)
+   {
+      printf("Nanosleep failed.\n");
+      exit(-1);
+   }
+}
+
 /*Runs the chronometer. The chronometer also prints on the screen the information about the race.*/
 void *omnium_chronometer(void *args)
 {
    int milliseconds_adder = 72;
-   struct timespec tim, tim2;
-   tim.tv_sec = tim2.tv_sec = 0;
-   tim.tv_nsec = tim2.tv_nsec = 72000000; /*72ms*/
 
    /*Race will start. After countdown(), all cyclist threads will be unlocked.*/
    countdown();
-   
-   /*Race chronometer*/
-   elapsed_time = 0;
    
    /*Time thread will run until we have just 1 cyclist competing*/
    while(cyclists_competing != 1)
    {
       /*Simulation cycle*/
-      if (nanosleep(&tim , &tim2) < 0)
-      {
-         printf("Nanosleep failed.\n");
-         exit(-1);
-      }
+      await(72000000);
       elapsed_time += milliseconds_adder;
-      print_track();
       printf("Elapsed time: %.3f\n-----------------------\n",  elapsed_time / 100.0);
+      while(moved_cyclists != cyclists_competing) continue;
+      moved_cyclists = 0;
    }
 
 
@@ -222,6 +304,7 @@ void *omnium_chronometer(void *args)
 void countdown()
 {
    int i;
+
    printf("\nOmnium will start in 5 seconds!\n\n");
    for(i = 5; i >= 2; i--)
    {
@@ -229,7 +312,7 @@ void countdown()
       printf("%d...\n", i);
    }
    sleep(1);
-   printf("\nGO!\n");
+   printf("GO!\n\n");
    go = START;
 }
 
@@ -306,7 +389,7 @@ void make_cyclists(Cyclist *thread_args, int *initial_config, int initial_speed,
       thread_args[i].place = cyclists - i;
       thread_args[i].speed = initial_speed;
       thread_args[i].lap = 1; /*first lap*/
-      thread_args[i].broken = FALSE;
+      thread_args[i].broken = 'N';
    }
 }
 
@@ -388,12 +471,7 @@ int input_checker(int argc, char **argv)
 /*All the functions below this line are here for debugging purposes. TODO: delete these when done.*/
 void print_cyclist(Cyclist cyclist)
 {
-   printf("Cyclist number = %d\n", cyclist.number);
-   printf("Cyclist position = %d\n", cyclist.position);
-   printf("Cyclist speed = %d\n", cyclist.speed);
-   printf("Cyclist lap = %d\n", cyclist.lap);
-   if(cyclist.broken) printf("Cyclist broken? TRUE\n\n");
-   else printf("Cyclist broken? FALSE\n\n");
+   printf("Cyclist #%d | Track Position:  %d | Speed: %d | Lap: %d | Broken? %c\n", cyclist.number, cyclist.position, cyclist.speed, cyclist.lap, cyclist.broken);
 }
 
 /*Prints the information about the cyclists that are still competing*/
@@ -401,33 +479,29 @@ void print_track()
 {
    int i, c = 0;
    printf("Track configuration (just positions containing cyclists):\n\n");
-   for(i = 0; i < track_size; i++)
+   for(i = track_size-1; i > -1; i--)
    {
       if(c == cyclists_competing) break;
       if(track[i].cyclists == 0) continue;
-      printf("Track position (array index + 1): %d\n", i + 1);
+      printf("Track position (index): %d\n", i);
       printf("Cyclists in this position: %d\n", track[i].cyclists);
       if(track[i].cyclists >= 1) { 
-         printf("Cyclist number %d is in %d place.  (%p)\n", (*track[i].cyclist1).number, (*track[i].cyclist1).place, (void*)track[i].cyclist1); 
-         if((*track[i].cyclist1).broken) printf("This cyclist has broken.\n");
+         printf("Cyclist number %d is in %d place. Broken? %c  (%p)\n", (*track[i].cyclist1).number, (*track[i].cyclist1).place, (*track[i].cyclist1).broken, (void*)track[i].cyclist1); 
          ++c; 
       } 
       else { printf("\n"); continue; }
       if(track[i].cyclists >= 2) { 
-         printf("Cyclist number %d is in %d place.  (%p)\n", (*track[i].cyclist2).number, (*track[i].cyclist1).place, (void*)track[i].cyclist2); 
-         if((*track[i].cyclist2).broken) printf("This cyclist has broken.\n");
+         printf("Cyclist number %d is in %d place. Broken? %c (%p)\n", (*track[i].cyclist2).number, (*track[i].cyclist2).place, (*track[i].cyclist2).broken, (void*)track[i].cyclist2); 
          ++c; 
       }
       else { printf("\n"); continue; }
       if(track[i].cyclists >= 3) { 
-         printf("Cyclist number %d is in %d place.  (%p)\n", (*track[i].cyclist3).number, (*track[i].cyclist1).place, (void*)track[i].cyclist3); 
-         if((*track[i].cyclist3).broken) printf("This cyclist has broken.\n");
+         printf("Cyclist number %d is in %d place. Broken? %c (%p)\n", (*track[i].cyclist3).number, (*track[i].cyclist3).place, (*track[i].cyclist3).broken, (void*)track[i].cyclist3); 
          ++c; 
       }
       else { printf("\n"); continue; }
       if(track[i].cyclists >= 4) { 
-         printf("Cyclist number %d is in %d place.  (%p)\n\n", (*track[i].cyclist4).number, (*track[i].cyclist1).place, (void*)track[i].cyclist4); 
-         if((*track[i].cyclist4).broken) printf("This cyclist has broken.\n");
+         printf("Cyclist number %d is in %d place. Broken? %c (%p)\n\n", (*track[i].cyclist4).number, (*track[i].cyclist4).place, (*track[i].cyclist4).broken, (void*)track[i].cyclist4); 
          ++c; 
       }
    }
@@ -458,18 +532,27 @@ LER SAÍDA NO ENUNCIADO
 ------------------------------------------------------
 7)
 UM CICLISTA É ELIMINADO QUANDO ELE TEM POSITION == track_size-1 e 
+------------------------------------------------------
+8)
+MODIFICAR LAP QUANDO COMPLETA UMA VOLTA
 
 
 QUESTOES:
-As informações de print_track() precisam mesmo ser printadas no terminal ou em um arquivo de saída?
-
+- As informações de print_track() precisam mesmo ser printadas no terminal ou em um arquivo de saída?
+- Implementei o semaforo nã mão. Pode fazer isso ou precisa usar alguma biblioteca existente pra isso?
 
 
 
 Informações relatório:
 O programa foi testado com n <= 380. Acima disso, provavelmente você pode receber core dumped
 
+Um ciclista que inicialmente estava ATRAS, ao ficar na mesma posição de um que estava a frente dele, vai manter a sua posição no placar.
+Sua posição só será alterada se ele fizer uma ULTRAPASSAGEM COMPLETA.
 
+
+
+PROBLEMA:
+Atual implelentação corre risco de elapsed time dar arithmetic overflow
 
 
 

@@ -7,3 +7,4 @@ race.o: race.c
 clean:
 	rm -rf *.o
 	rm -rf *~
+	rm race

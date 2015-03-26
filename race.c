@@ -18,12 +18,13 @@
 
 /*struct containing the attributes of a cyclist*/
 typedef struct cyclist { 
-   int number;    /*Cyclist number*/
-   int position;  /*Position in the track. [0...track_size-1]. Position is printed as*/
-   int place;     /*His place of the race (1 for first, 2 for second... cyclist_competing for last (in actual lap))*/
-   int speed;     /*Cyclist speed. 25km/h or 50km/h*/
-   int lap;       /*His actual lap*/
-   char broken;   /*did he broke?*/
+   int number;       /*Cyclist number*/
+   int position;     /*Position in the track. [0...track_size-1]. Position is printed as*/
+   int place;        /*His place of the race (1 for first, 2 for second... cyclist_competing for last (in actual lap))*/
+   int speed;        /*Cyclist speed. 25km/h or 50km/h*/
+   int lap;          /*His actual lap*/
+   char eliminated;  /*is he eliminated?*/
+   char broken;      /*did he broke?*/
 } Cyclist;
 
 /*Each position of the track is a cell of type meter*/
@@ -73,6 +74,8 @@ void put_cyclists_in_track(Cyclist*, int);
 void move_cyclist(Cyclist*);
 void semaphore(Cyclist*);
 void await(int);
+void eliminate(Cyclist*);
+int disqualified(Cyclist*);
 
 /*Test functions. TODO: delete these when done*/
 void print_cyclist(Cyclist);
@@ -182,44 +185,71 @@ void make_track()
 /*Attempts to move a cyclist*/
 void move_cyclist(Cyclist *cyclist)
 {
-   int next_position = (cyclist->position + 1) % track_size;
+   /*first_position is his position before dislocating. next_position is after succesfully moving*/
+   int first_position = cyclist->position, next_position = (cyclist->position + 1) % track_size;
    if(track[next_position].cyclists < 4) 
    {
-      /*This cyclist forwarded 1 position*/
-      (track[cyclist->position].cyclists)--;
+      /*In case he is at track[track_size-1], he will complete a new lap*/
+      if(first_position == track_size-1) (cyclist->lap)++;
+
+      /*This cyclist is forwarded by 1 position*/
+      (track[first_position].cyclists)--;
       (track[next_position].cyclists)++;
       cyclist->position = next_position;
 
-
-      if((track[cyclist->position].cyclists) > MAX_CYCLISTS) 
+      if((track[next_position].cyclists) > MAX_CYCLISTS) 
       {
-         printf("\nError. Found more than 4 cyclists in track[%d].\n", cyclist->position);
+         printf("\nError. Found more than 4 cyclists in track[%d].\n", next_position);
          exit(0);
       }
-      if(cyclist->position - 1 > 0 && ((track[cyclist->position - 1].cyclists) < NO_CYCLISTS)) 
+      if(first_position > 0 && ((track[first_position].cyclists) < NO_CYCLISTS)) 
       {
-         printf("\nError. Found negative number of cyclists in track[%d].\n", cyclist->position - 1);
-         exit(0);
-      }
-      else if(cyclist->position - 1 == 0 && ((track[track_size-1].cyclists) < NO_CYCLISTS)) 
-      {
-         printf("\nError. Found negative number of cyclists in track[%d].\n", track_size - 1);
+         printf("\nError. Found negative number of cyclists in track[%d].\n", first_position);
          exit(0);
       }
 
-      if(track[cyclist->position - 1].cyclist1 == cyclist) track[cyclist->position - 1].cyclist1 = NULL;
-      else if(track[cyclist->position - 1].cyclist2 == cyclist) track[cyclist->position - 1].cyclist2 = NULL;
-      else if(track[cyclist->position - 1].cyclist3 == cyclist) track[cyclist->position - 1].cyclist3 = NULL;
-      else track[cyclist->position - 1].cyclist4 = NULL; 
+      if(track[first_position].cyclist1 == cyclist) track[first_position].cyclist1 = NULL;
+      else if(track[first_position].cyclist2 == cyclist) track[first_position].cyclist2 = NULL;
+      else if(track[first_position].cyclist3 == cyclist) track[first_position].cyclist3 = NULL;
+      else track[first_position].cyclist4 = NULL; 
       
-      if(track[cyclist->position].cyclist1 == NULL) track[cyclist->position].cyclist1 = cyclist;
-      else if(track[cyclist->position].cyclist2 == NULL) track[cyclist->position].cyclist2 = cyclist;
-      else if(track[cyclist->position].cyclist3 == NULL) track[cyclist->position].cyclist3 = cyclist;
-      else track[cyclist->position].cyclist4 = cyclist;
+      if(track[next_position].cyclist1 == NULL) track[next_position].cyclist1 = cyclist;
+      else if(track[next_position].cyclist2 == NULL) track[next_position].cyclist2 = cyclist;
+      else if(track[next_position].cyclist3 == NULL) track[next_position].cyclist3 = cyclist;
+      else track[next_position].cyclist4 = cyclist;
 
-      moved_cyclists++;
+
+      /*See if this cyclist will break (1% chance).*/
+      if((cyclist->position == 0) && (cyclist->lap > 1) && (cyclist->lap % 4 == 1))
+      {
+         /*do break_attempt*/
+      }
+
+      /*Eliminates this cyclist if he is the last in this lap*/
+      if((cyclist->position == 0) && (cyclist->lap > 1) && (cyclist->place == cyclists_competing) && (cyclist->broken == 'N'))
+      {
+         /*do eliminate*/
+         eliminate(cyclist);
+      }
+      else moved_cyclists++;
       print_cyclist(*cyclist);
    }
+   /*The cyclist must wait a free space to move. HE MUST MAKE A MOVE IN THIS CYCLE*/
+   else
+   {
+      /*TODO*/
+   }
+}
+
+/*Eliminates the last cyclist to complete the lap*/
+void eliminate(Cyclist *cyclist)
+{
+   if(track[cyclist->position].cyclist1 == cyclist) track[cyclist->position].cyclist1 = NULL;
+   else if(track[cyclist->position].cyclist2 == cyclist) track[cyclist->position].cyclist2 = NULL;
+   else if(track[cyclist->position].cyclist3 == cyclist) track[cyclist->position].cyclist3 = NULL;
+   else track[cyclist->position].cyclist4 = NULL;
+   cyclist->eliminated = 'Y';
+   cyclists_competing--;
 }
 
 /*Semaphore*/
@@ -228,6 +258,23 @@ void semaphore(Cyclist *cyclist)
    pthread_mutex_lock(&lock);
    move_cyclist(cyclist);
    pthread_mutex_unlock(&lock);
+}
+
+/*Broadcasts eliminated cyclist*/
+int disqualified(Cyclist *cyclist)
+{
+   if(cyclist->eliminated == 'Y' || cyclist->broken == 'Y') return 1;
+   return 0;
+}
+
+void broadcast(Cyclist *cyclist)
+{
+   if(cyclist->eliminated == 'Y')
+      printf("\n***************************\nThe cyclist %d (%p) has been ELIMINATED.\n***************************\n", cyclist->number, (void*)cyclist);
+   else if(cyclist->broken == 'Y')
+      printf("\n***************************\nThe cyclist %d (%p) has  BROKEN.\n***************************\n", cyclist->number, (void*)cyclist);
+   else
+      printf("\n***************************\nThe cyclist %d (%p) has WON THE RACE.\n***************************\n", cyclist->number, (void*)cyclist);
 }
 
 /*Omnium race function in 'u' mode*/
@@ -243,9 +290,12 @@ void *omnium_u(void *args)
       /*Cyclist can attempt to move to next cell in the track array*/
       semaphore(cyclist);
       while(moved_cyclists != 0) continue;
-      await(cyclists_competing * 300000);
+      /*Broken or eliminated cyclists are out*/
+      if(disqualified(cyclist) == 1) break;
+      /*TODO: Remove this await POG*/
+      await(cyclists_competing * 600000);
    }
-
+   broadcast(cyclist);
    return NULL;
 }
 
@@ -389,6 +439,7 @@ void make_cyclists(Cyclist *thread_args, int *initial_config, int initial_speed,
       thread_args[i].place = cyclists - i;
       thread_args[i].speed = initial_speed;
       thread_args[i].lap = 1; /*first lap*/
+      thread_args[i].eliminated = 'N';
       thread_args[i].broken = 'N';
    }
 }
@@ -471,7 +522,7 @@ int input_checker(int argc, char **argv)
 /*All the functions below this line are here for debugging purposes. TODO: delete these when done.*/
 void print_cyclist(Cyclist cyclist)
 {
-   printf("Cyclist #%d | Track Position:  %d | Speed: %d | Lap: %d | Broken? %c\n", cyclist.number, cyclist.position, cyclist.speed, cyclist.lap, cyclist.broken);
+   printf("Cyclist #%d | Track Position:  %d | Speed: %d | Lap: %d\n", cyclist.number, cyclist.position, cyclist.speed, cyclist.lap);
 }
 
 /*Prints the information about the cyclists that are still competing*/
@@ -486,22 +537,22 @@ void print_track()
       printf("Track position (index): %d\n", i);
       printf("Cyclists in this position: %d\n", track[i].cyclists);
       if(track[i].cyclists >= 1) { 
-         printf("Cyclist number %d is in %d place. Broken? %c  (%p)\n", (*track[i].cyclist1).number, (*track[i].cyclist1).place, (*track[i].cyclist1).broken, (void*)track[i].cyclist1); 
+         printf("Cyclist number %d is in %d place. (%p)\n", (*track[i].cyclist1).number, (*track[i].cyclist1).place, (void*)track[i].cyclist1); 
          ++c; 
       } 
       else { printf("\n"); continue; }
       if(track[i].cyclists >= 2) { 
-         printf("Cyclist number %d is in %d place. Broken? %c (%p)\n", (*track[i].cyclist2).number, (*track[i].cyclist2).place, (*track[i].cyclist2).broken, (void*)track[i].cyclist2); 
+         printf("Cyclist number %d is in %d place. (%p)\n", (*track[i].cyclist2).number, (*track[i].cyclist2).place, (void*)track[i].cyclist2); 
          ++c; 
       }
       else { printf("\n"); continue; }
       if(track[i].cyclists >= 3) { 
-         printf("Cyclist number %d is in %d place. Broken? %c (%p)\n", (*track[i].cyclist3).number, (*track[i].cyclist3).place, (*track[i].cyclist3).broken, (void*)track[i].cyclist3); 
+         printf("Cyclist number %d is in %d place. (%p)\n", (*track[i].cyclist3).number, (*track[i].cyclist3).place, (void*)track[i].cyclist3); 
          ++c; 
       }
       else { printf("\n"); continue; }
       if(track[i].cyclists >= 4) { 
-         printf("Cyclist number %d is in %d place. Broken? %c (%p)\n\n", (*track[i].cyclist4).number, (*track[i].cyclist4).place, (*track[i].cyclist4).broken, (void*)track[i].cyclist4); 
+         printf("Cyclist number %d is in %d place. (%p)\n\n", (*track[i].cyclist4).number, (*track[i].cyclist4).place, (void*)track[i].cyclist4); 
          ++c; 
       }
    }
@@ -535,6 +586,9 @@ UM CICLISTA É ELIMINADO QUANDO ELE TEM POSITION == track_size-1 e
 ------------------------------------------------------
 8)
 MODIFICAR LAP QUANDO COMPLETA UMA VOLTA
+------------------------------------------------------
+9)
+Colocar seed time nas rands!
 
 
 QUESTOES:

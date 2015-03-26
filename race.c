@@ -77,7 +77,13 @@ void move_cyclist(Cyclist*);
 void critical_section(Cyclist*);
 void await(int);
 void print_cyclist(Cyclist);
-float convert_to_meters(int position);
+float convert_index_to_meters(int);
+int convert_meters_to_index(float);
+int lap_complete(int);
+void increment_lap(Cyclist*);
+void move(Cyclist*, int, int);
+float decide_next_position25(Cyclist*, int);
+float decide_next_position50(Cyclist*, int);
 
 /*Test functions. TODO: delete these when done*/
 void print_track();
@@ -191,21 +197,121 @@ while speed 50km walks a full cell (1m in a cycle of 72ms), according to the enu
 void move_cyclist(Cyclist *cyclist)
 {
    float position1 = cyclist->position, position2;
-      printf("AQUI %.1f ", position1);
    if(cyclist->speed == 25)
    {
-      position2 = cyclist->position + 0.5; /*Because the speed is 25km/h.*/
+      position2 = decide_next_position25(cyclist, cyclist->position);
       /*The cyclists can only advance if there's at least 1 empty slot ahead*/
-      if(track[(int)position2].cyclists < 4) 
+      if(track[convert_meters_to_index(position2)].cyclists < 4) 
       {
+         /*If he is going to complete a lap, increments*/
+         if(lap_complete(convert_meters_to_index(position2))) increment_lap(cyclist);
 
+         /*This cyclist will be forwarded 0.5m*/
+         move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
+
+         /*See if this cyclist will break (1% chance).*/
+         /*TODO*/
+
+         /*See if this cyclist is eliminated*/
+         /*TODO*/
+
+         print_cyclist(*cyclist);
       }
    }
    else /*cyclist->speed == 50*/
    {
-      position1 = cyclist->position;
-      position2 = cyclist->position + 1.0; /*Because the speed is 50km/h.*/
+      position2 = decide_next_position50(cyclist, cyclist->position);
+      if(track[convert_meters_to_index(position2 - 0.5)].cyclists < 4) 
+      {
+         if(track[convert_meters_to_index(position2)].cyclists < 4) 
+         {
+            /*If he is going to complete a lap, increments*/
+            if(lap_complete(convert_meters_to_index(position2))) increment_lap(cyclist);
+
+            /*This cyclist is will be forwarded 0.5m*/
+            move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
+
+            /*See if this cyclist will break (1% chance).*/
+            /*TODO*/
+
+            /*See if this cyclist is eliminated*/
+            /*TODO*/
+
+            print_cyclist(*cyclist);           
+         }
+         else /*He will be able to advance only half a meter*/
+         {
+            /*If he is going to complete a lap, increments*/
+            if(lap_complete(convert_meters_to_index(position2))) increment_lap(cyclist);
+            
+            /*This cyclist is will be forwarded 1m*/
+            move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
+
+            /*See if this cyclist will break (1% chance).*/
+            /*TODO*/
+
+            /*See if this cyclist is eliminated*/
+            /*TODO*/
+
+            print_cyclist(*cyclist);
+         }
+      }
    }
+}
+
+/*Decides the next position  for speed = 25 and if he is at track_size-1*/
+float decide_next_position25(Cyclist *cyclist, int position1)
+{
+   if(position1 == track_size-1) return 0.5;
+   return cyclist->position + 0.5;
+}
+/*Decides the next position for speed = 50 and if he is at track_size-1 or track_size-2*/
+float decide_next_position50(Cyclist *cyclist, int position1)
+{
+   if(position1 == track_size-1) return 1.0;
+   if(position1 == track_size-2) return 0.5;
+   return cyclist->position + 1.0;
+}
+
+/*Moves the cyclist*/
+void move(Cyclist *cyclist, int position1, int position2)
+{
+   (track[position1].cyclists)--;
+   (track[position2].cyclists)++;
+   cyclist->position = convert_index_to_meters(position2);
+
+   if((track[position2].cyclists) > MAX_CYCLISTS) 
+   {
+      printf("\nError. Found more than 4 cyclists in track[%d].\n", position2);
+      exit(0);
+   }
+   if(position1 > 0 && ((track[position1].cyclists) < NO_CYCLISTS)) 
+   {
+      printf("\nError. Found negative number of cyclists in track[%d].\n", position1);
+      exit(0);
+   }
+
+   if(track[position1].cyclist1 == cyclist) track[position1].cyclist1 = NULL;
+   else if(track[position1].cyclist2 == cyclist) track[position1].cyclist2 = NULL;
+   else if(track[position1].cyclist3 == cyclist) track[position1].cyclist3 = NULL;
+   else track[position1].cyclist4 = NULL; 
+   
+   if(track[position2].cyclist1 == NULL) track[position2].cyclist1 = cyclist;
+   else if(track[position2].cyclist2 == NULL) track[position2].cyclist2 = cyclist;
+   else if(track[position2].cyclist3 == NULL) track[position2].cyclist3 = cyclist;
+   else track[position2].cyclist4 = cyclist;
+}
+
+/*Checks is the cyclist in this position will complete a new lap*/
+int lap_complete(int position)
+{
+   if(track_size - 1 == position) return 1;
+   return 0;
+}
+
+void increment_lap(Cyclist *cyclist)
+{
+   (cyclist->lap)++;
 }
 
 /*CS*/
@@ -225,6 +331,7 @@ void *omnium_u(void *args)
 
    print_cyclist(*cyclist);
    while(!go) continue;
+
 
    while(cyclists_competing != 1) 
    {
@@ -313,11 +420,11 @@ void countdown()
 
 void put_cyclists_in_track(Cyclist *thread_args, int cyclists)
 {
-   int i;
-   for(i = 1; i < cyclists; i += 2)
+   int i, j;
+   for(i = 0, j = 1; i < cyclists; i++, j+=2)
    {
-      track[i].cyclist1 = &thread_args[i];
-      track[i].cyclists = 1;
+      track[j].cyclist1 = &thread_args[i];
+      track[j].cyclists = 1;
    }
 }
 
@@ -376,11 +483,11 @@ void join_threads(int cyclists, pthread_t *my_threads)
 /*Add all the attributes to the cyclists.*/
 void make_cyclists(Cyclist *thread_args, int *initial_config, int initial_speed, int cyclists)
 {
-   int i;
-   for(i = 0; i < cyclists; i++)
+   int i, j;
+   for(i = 0, j = 1; i < cyclists; i++, j+=2)
    {
       thread_args[i].number = initial_config[i];
-      thread_args[i].position = i; /*At the start of the race, all cyclists starts with 1m space of each other independent of the mode*/
+      thread_args[i].position = convert_index_to_meters(j); /*At the start of the race, all cyclists starts with 1m space of each other independent of the mode*/
       thread_args[i].place = cyclists - i;
       thread_args[i].speed = initial_speed;
       thread_args[i].lap = 1; /*first lap*/
@@ -401,11 +508,17 @@ int *initial_configuration(int max_cyclists)
    return initial_config;
 }
 
-/*Converts the position of the cyclist or the track position to a float position*/
-float convert_to_meters(int position)
+/*Converts the position of the cyclist or the track index to a float position*/
+float convert_index_to_meters(int position)
 {
    if(position % 2 == 1) return (position / 2) + 1.0;
    return (position / 2) + 0.5;
+}
+
+/*Converts the the cyclist position to a track index*/
+int convert_meters_to_index(float position)
+{
+   return (int)((position * 2) - 1);
 }
 
 /*Organize the cyclists by their number in a random order*/
@@ -486,7 +599,7 @@ void print_track()
    {
       if(c == cyclists_competing) break;
       if(track[i].cyclists == 0) continue;
-      printf("Track position (index): %d\n", i);
+      printf("Track position %.1f meters (index = %d):\n", convert_index_to_meters(i), i);
       printf("Cyclists in this position: %d\n", track[i].cyclists);
       if(track[i].cyclists >= 1) { 
          printf("Cyclist number %d is in %d place. (%p)\n", (*track[i].cyclist1).number, (*track[i].cyclist1).place, (void*)track[i].cyclist1); 

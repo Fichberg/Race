@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <strings.h>
 #include <time.h>
+
 #include <unistd.h>
 
 #define MINIMUM_CYCLISTS 3
@@ -76,6 +77,7 @@ void move_cyclist(Cyclist*);
 void critical_section(Cyclist*);
 void await(int);
 void print_cyclist(Cyclist);
+float convert_to_meters(int position);
 
 /*Test functions. TODO: delete these when done*/
 void print_track();
@@ -117,7 +119,8 @@ int main(int argc, char **argv)
    }
 
    /*Sets the size of the track*/
-   track_size = atoi(argv[1]);
+   /*Multiplied by 2 because cyclist can move 0.5m when they are with a speed of 25km/h*/
+   track_size = (atoi(argv[1]) * 2);
 
    /*Initialize global variable*/
    moved_cyclists = 0;
@@ -183,9 +186,26 @@ void make_track()
 }
 
 /*Attempts to move a cyclist*/
+/*Note: A cyclist with speed = 25 walks 0.5cells (0.5m in a cycle of 72ms) in track array, 
+while speed 50km walks a full cell (1m in a cycle of 72ms), according to the enuntiacion*/
 void move_cyclist(Cyclist *cyclist)
 {
-   
+   float position1 = cyclist->position, position2;
+      printf("AQUI %.1f ", position1);
+   if(cyclist->speed == 25)
+   {
+      position2 = cyclist->position + 0.5; /*Because the speed is 25km/h.*/
+      /*The cyclists can only advance if there's at least 1 empty slot ahead*/
+      if(track[(int)position2].cyclists < 4) 
+      {
+
+      }
+   }
+   else /*cyclist->speed == 50*/
+   {
+      position1 = cyclist->position;
+      position2 = cyclist->position + 1.0; /*Because the speed is 50km/h.*/
+   }
 }
 
 /*CS*/
@@ -294,7 +314,7 @@ void countdown()
 void put_cyclists_in_track(Cyclist *thread_args, int cyclists)
 {
    int i;
-   for(i = 0; i < cyclists; i++)
+   for(i = 1; i < cyclists; i += 2)
    {
       track[i].cyclist1 = &thread_args[i];
       track[i].cyclists = 1;
@@ -360,7 +380,7 @@ void make_cyclists(Cyclist *thread_args, int *initial_config, int initial_speed,
    for(i = 0; i < cyclists; i++)
    {
       thread_args[i].number = initial_config[i];
-      thread_args[i].position = i;
+      thread_args[i].position = i; /*At the start of the race, all cyclists starts with 1m space of each other independent of the mode*/
       thread_args[i].place = cyclists - i;
       thread_args[i].speed = initial_speed;
       thread_args[i].lap = 1; /*first lap*/
@@ -379,6 +399,13 @@ int *initial_configuration(int max_cyclists)
    set_cyclists(initial_config, 0, 0, max_cyclists);
 
    return initial_config;
+}
+
+/*Converts the position of the cyclist or the track position to a float position*/
+float convert_to_meters(int position)
+{
+   if(position % 2 == 1) return (position / 2) + 1.0;
+   return (position / 2) + 0.5;
 }
 
 /*Organize the cyclists by their number in a random order*/
@@ -447,7 +474,7 @@ int input_checker(int argc, char **argv)
 /*All the functions below this line are here for debugging purposes. TODO: delete these when done.*/
 void print_cyclist(Cyclist cyclist)
 {
-   printf("Cyclist #%d | Track Position:  %d | Speed: %d | Lap: %d\n", cyclist.number, cyclist.position, cyclist.speed, cyclist.lap);
+   printf("Cyclist #%d | Track Position:  %.1fm | Speed: %d | Lap: %d\n", cyclist.number, (float)cyclist.position, cyclist.speed, cyclist.lap);
 }
 
 /*Prints the information about the cyclists that are still competing*/

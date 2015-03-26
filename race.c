@@ -49,10 +49,12 @@ Track track;
 int track_size;
 /*Global variable. Says if the race has started*/
 int go;
-/*Global variable. Protexts the writing in track array*/
+/*Global variable. Protects the writing in track array*/
 pthread_mutex_t lock;
-/*Global variable. All cyclists moved*/
+/*Global variable. A counter to the number of cyclists that moved in a time cycle*/
 int moved_cyclists;
+/*Global variable. Contains the number of the last cyclist to move*/
+int last;
 
 /*Functions declarations*/
 int input_checker(int, char **);
@@ -69,16 +71,14 @@ void join_time_thread(pthread_t);
 void *omnium_chronometer(void*);
 void countdown();
 void make_track();
-void print_track();
 void put_cyclists_in_track(Cyclist*, int);
 void move_cyclist(Cyclist*);
-void semaphore(Cyclist*);
+void critical_section(Cyclist*);
 void await(int);
-void eliminate(Cyclist*);
-int disqualified(Cyclist*);
+void print_cyclist(Cyclist);
 
 /*Test functions. TODO: delete these when done*/
-void print_cyclist(Cyclist);
+void print_track();
 
 int main(int argc, char **argv)
 {
@@ -109,9 +109,6 @@ int main(int argc, char **argv)
    /*Race chronometer*/
    elapsed_time = 0;
 
-   /*Cyclists made no movement yet*/
-   moved_cyclists = 0;
-
    /*Lock is initialized*/
    if (pthread_mutex_init(&lock, NULL) != 0)
    {
@@ -121,6 +118,9 @@ int main(int argc, char **argv)
 
    /*Sets the size of the track*/
    track_size = atoi(argv[1]);
+
+   /*Initialize global variable*/
+   moved_cyclists = 0;
 
    /*Allocates the track*/
    make_track();
@@ -185,96 +185,17 @@ void make_track()
 /*Attempts to move a cyclist*/
 void move_cyclist(Cyclist *cyclist)
 {
-   /*first_position is his position before dislocating. next_position is after succesfully moving*/
-   int first_position = cyclist->position, next_position = (cyclist->position + 1) % track_size;
-   if(track[next_position].cyclists < 4) 
-   {
-      /*In case he is at track[track_size-1], he will complete a new lap*/
-      if(first_position == track_size-1) (cyclist->lap)++;
-
-      /*This cyclist is forwarded by 1 position*/
-      (track[first_position].cyclists)--;
-      (track[next_position].cyclists)++;
-      cyclist->position = next_position;
-
-      if((track[next_position].cyclists) > MAX_CYCLISTS) 
-      {
-         printf("\nError. Found more than 4 cyclists in track[%d].\n", next_position);
-         exit(0);
-      }
-      if(first_position > 0 && ((track[first_position].cyclists) < NO_CYCLISTS)) 
-      {
-         printf("\nError. Found negative number of cyclists in track[%d].\n", first_position);
-         exit(0);
-      }
-
-      if(track[first_position].cyclist1 == cyclist) track[first_position].cyclist1 = NULL;
-      else if(track[first_position].cyclist2 == cyclist) track[first_position].cyclist2 = NULL;
-      else if(track[first_position].cyclist3 == cyclist) track[first_position].cyclist3 = NULL;
-      else track[first_position].cyclist4 = NULL; 
-      
-      if(track[next_position].cyclist1 == NULL) track[next_position].cyclist1 = cyclist;
-      else if(track[next_position].cyclist2 == NULL) track[next_position].cyclist2 = cyclist;
-      else if(track[next_position].cyclist3 == NULL) track[next_position].cyclist3 = cyclist;
-      else track[next_position].cyclist4 = cyclist;
-
-
-      /*See if this cyclist will break (1% chance).*/
-      if((cyclist->position == 0) && (cyclist->lap > 1) && (cyclist->lap % 4 == 1))
-      {
-         /*do break_attempt*/
-      }
-
-      /*Eliminates this cyclist if he is the last in this lap*/
-      if((cyclist->position == 0) && (cyclist->lap > 1) && (cyclist->place == cyclists_competing) && (cyclist->broken == 'N'))
-      {
-         /*do eliminate*/
-         eliminate(cyclist);
-      }
-      else moved_cyclists++;
-      print_cyclist(*cyclist);
-   }
-   /*The cyclist must wait a free space to move. HE MUST MAKE A MOVE IN THIS CYCLE*/
-   else
-   {
-      /*TODO*/
-   }
+   
 }
 
-/*Eliminates the last cyclist to complete the lap*/
-void eliminate(Cyclist *cyclist)
-{
-   if(track[cyclist->position].cyclist1 == cyclist) track[cyclist->position].cyclist1 = NULL;
-   else if(track[cyclist->position].cyclist2 == cyclist) track[cyclist->position].cyclist2 = NULL;
-   else if(track[cyclist->position].cyclist3 == cyclist) track[cyclist->position].cyclist3 = NULL;
-   else track[cyclist->position].cyclist4 = NULL;
-   cyclist->eliminated = 'Y';
-   cyclists_competing--;
-}
-
-/*Semaphore*/
-void semaphore(Cyclist *cyclist)
+/*CS*/
+void critical_section(Cyclist *cyclist)
 {
    pthread_mutex_lock(&lock);
    move_cyclist(cyclist);
+   if(moved_cyclists + 1 == cyclists_competing) last = cyclist->number;
+   moved_cyclists++;
    pthread_mutex_unlock(&lock);
-}
-
-/*Broadcasts eliminated cyclist*/
-int disqualified(Cyclist *cyclist)
-{
-   if(cyclist->eliminated == 'Y' || cyclist->broken == 'Y') return 1;
-   return 0;
-}
-
-void broadcast(Cyclist *cyclist)
-{
-   if(cyclist->eliminated == 'Y')
-      printf("\n***************************\nThe cyclist %d (%p) has been ELIMINATED.\n***************************\n", cyclist->number, (void*)cyclist);
-   else if(cyclist->broken == 'Y')
-      printf("\n***************************\nThe cyclist %d (%p) has  BROKEN.\n***************************\n", cyclist->number, (void*)cyclist);
-   else
-      printf("\n***************************\nThe cyclist %d (%p) has WON THE RACE.\n***************************\n", cyclist->number, (void*)cyclist);
 }
 
 /*Omnium race function in 'u' mode*/
@@ -287,28 +208,28 @@ void *omnium_u(void *args)
 
    while(cyclists_competing != 1) 
    {
-      /*Cyclist can attempt to move to next cell in the track array*/
-      semaphore(cyclist);
-      while(moved_cyclists != 0) continue;
-      /*Broken or eliminated cyclists are out*/
-      if(disqualified(cyclist) == 1) break;
-      /*TODO: Remove this await POG*/
-      await(cyclists_competing * 600000);
+      /*Critical section*/
+      critical_section(cyclist);
+      while(moved_cyclists != 0) if(cyclist->number == last) last = -1;
+      /*Give time to all threads leave the last while*/
+      await(2000000); /*2ms*/
+      
    }
-   broadcast(cyclist);
    return NULL;
 }
 
 /*Omnium race function in 'v' mode*/
 void *omnium_v(void *args)
 {
-   int n = 1;
    Cyclist *cyclist = ((Cyclist*) args);
 
-   while(!go) continue;
    print_cyclist(*cyclist);
+   while(!go) continue;
 
-   while(cyclists_competing != 1) continue;
+   while(cyclists_competing != 1) 
+   {
+      continue;
+   }
 
    return NULL;
 }
@@ -342,7 +263,11 @@ void *omnium_chronometer(void *args)
       await(72000000);
       elapsed_time += milliseconds_adder;
       printf("Elapsed time: %.3f\n-----------------------\n",  elapsed_time / 100.0);
+      /*All cyclists must have moved within this cycle*/
       while(moved_cyclists != cyclists_competing) continue;
+      /*Wait the thread of the last cyclist "group" with the others*/
+      while(last != -1) continue;
+      /*Release the cyclists!*/
       moved_cyclists = 0;
    }
 

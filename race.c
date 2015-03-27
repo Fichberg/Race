@@ -313,8 +313,6 @@ void eliminate(Cyclist *cyclist)
    else track[index].cyclist4 = NULL;
    /*Marks him to eliminate him after*/
    cyclist->eliminated = 'Y';
-   moved_cyclists--; /*to keep balanced the condition in omnium_chronometer*/
-   cyclists_competing--;
 }
 
 /*Decides the next position  for speed = 25 and if he is at track_size-1*/
@@ -384,9 +382,10 @@ void increment_lap(Cyclist *cyclist)
 void critical_section(Cyclist *cyclist)
 {
    pthread_mutex_lock(&lock);
+   if(moved_cyclists == cyclists_competing) {printf("\n"); await(10000000); moved_cyclists = 0;}
    move_cyclist(cyclist);
-   if(moved_cyclists + 1 == cyclists_competing) last = cyclist->number;
-   moved_cyclists++;
+   if(cyclist->eliminated == 'N') moved_cyclists++;
+   else cyclists_competing--;
    pthread_mutex_unlock(&lock);
 }
 
@@ -402,11 +401,9 @@ void *omnium_u(void *args)
    {
       /*Critical section*/
       critical_section(cyclist);
-      await(4000000); /*4ms*/
-      while(moved_cyclists != 0) if(cyclist->number == last) last = -1;
-      /*Give time to all threads leave the last while*/
       if(disqualified(cyclist) == 1) break;
-      await(4000000); /*4ms*/
+      await(72000000);
+      while(moved_cyclists != cyclists_competing) continue;
    }
    broadcast(cyclist);
    return NULL;
@@ -435,20 +432,15 @@ void *omnium_chronometer(void *args)
 
    /*Race will start. After countdown(), all cyclist threads will be unlocked.*/
    countdown();
+   /*RELEASE THE CYCLISTS!*/
    
    /*Time thread will run until we have just 1 cyclist competing*/
    while(cyclists_competing != 1)
    {
-      /*Simulation cycle*/
+      /*All cyclists must have moved within this cycle*/
       await(72000000);
       elapsed_time += milliseconds_adder;
-      printf("Elapsed time: %.3f\n-----------------------\n",  elapsed_time / 100.0);
-      /*All cyclists must have moved within this cycle*/
-      while(moved_cyclists != cyclists_competing) continue;
-      /*Wait the thread of the last cyclist "group" with the others*/
-      while(last != -1) continue;
-      /*Release the cyclists!*/
-      moved_cyclists = 0;
+      /*printf("Elapsed time: %.3f\n-----------------------\n",  elapsed_time / 100.0);*/
    }
 
    return NULL;

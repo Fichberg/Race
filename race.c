@@ -311,6 +311,8 @@ void eliminate(Cyclist *cyclist)
    else if(track[index].cyclist2 == cyclist) track[index].cyclist2 = NULL;
    else if(track[index].cyclist3 == cyclist) track[index].cyclist3 = NULL;
    else track[index].cyclist4 = NULL;
+   /*Others cyclists can advance to this position.*/
+   (track[index].cyclists)--;
    /*Marks him to eliminate him after*/
    cyclist->eliminated = 'Y';
 }

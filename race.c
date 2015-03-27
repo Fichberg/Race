@@ -220,7 +220,7 @@ void move_cyclist(Cyclist *cyclist)
          /*TODO*/
 
          /*See if this cyclist is eliminated*/
-         eliminate_cyclist(cyclist, position1, position2);
+         eliminate_cyclist(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
          /*print_cyclist(*cyclist);*/
       }
@@ -245,7 +245,7 @@ void move_cyclist(Cyclist *cyclist)
             /*TODO*/
 
             /*See if this cyclist is eliminated*/
-            eliminate_cyclist(cyclist, position1, position2);
+            eliminate_cyclist(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
             print_cyclist(*cyclist);           
          }
@@ -264,7 +264,7 @@ void move_cyclist(Cyclist *cyclist)
             /*TODO*/
 
             /*See if this cyclist is eliminated*/
-            eliminate_cyclist(cyclist, position1, position2);
+            eliminate_cyclist(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
             print_cyclist(*cyclist);
          }
@@ -404,8 +404,9 @@ void *omnium_u(void *args)
       /*Critical section*/
       critical_section(cyclist);
       while(moved_cyclists != 0) if(cyclist->number == last) last = -1;
-      if(disqualified(cyclist) == 1) break;
       /*Give time to all threads leave the last while*/
+      await(2000000); /*2ms*/
+      if(disqualified(cyclist) == 1) break;
       await(2000000); /*2ms*/
    }
    broadcast(cyclist);

@@ -653,7 +653,7 @@ int input_checker(int argc, char **argv)
 /*All the functions below this line are here for debugging purposes. TODO: delete these when done.*/
 void print_cyclist(Cyclist cyclist)
 {
-   printf("Cyclist #%d | Track Position:  %.1fm | Speed: %d | Lap: %d\n", cyclist.number, cyclist.position, cyclist.speed, cyclist.lap);
+   printf("Cyclist #%d | Track Position:  %.1fm | Place: %d | Speed: %d | Lap: %d\n", cyclist.number, cyclist.position, cyclist.place, cyclist.speed, cyclist.lap);
 }
 
 /*Prints the information about the cyclists that are still competing*/

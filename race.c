@@ -20,7 +20,7 @@
 /*struct containing the attributes of a cyclist*/
 typedef struct cyclist { 
    int number;       /*Cyclist number*/
-   int position;     /*Position in the track. [0...track_size-1]. Position is printed as*/
+   float position;     /*Position in the track. [0...track_size-1]. Position is printed as*/
    int place;        /*His place of the race (1 for first, 2 for second... cyclist_competing for last (in actual lap))*/
    int speed;        /*Cyclist speed. 25km/h or 50km/h*/
    int lap;          /*His actual lap*/
@@ -199,7 +199,7 @@ void move_cyclist(Cyclist *cyclist)
    float position1 = cyclist->position, position2;
    if(cyclist->speed == 25)
    {
-      position2 = decide_next_position25(cyclist, cyclist->position);
+      position2 = decide_next_position25(cyclist, convert_meters_to_index(cyclist->position));
       /*The cyclists can only advance if there's at least 1 empty slot ahead*/
       if(track[convert_meters_to_index(position2)].cyclists < 4) 
       {
@@ -215,12 +215,12 @@ void move_cyclist(Cyclist *cyclist)
          /*See if this cyclist is eliminated*/
          /*TODO*/
 
-         print_cyclist(*cyclist);
+         /*print_cyclist(*cyclist);*/
       }
    }
    else /*cyclist->speed == 50*/
    {
-      position2 = decide_next_position50(cyclist, cyclist->position);
+      position2 = decide_next_position50(cyclist, convert_meters_to_index(cyclist->position));
       if(track[convert_meters_to_index(position2 - 0.5)].cyclists < 4) 
       {
          if(track[convert_meters_to_index(position2)].cyclists < 4) 
@@ -511,8 +511,8 @@ int *initial_configuration(int max_cyclists)
 /*Converts the position of the cyclist or the track index to a float position*/
 float convert_index_to_meters(int position)
 {
-   if(position % 2 == 1) return (position / 2) + 1.0;
-   return (position / 2) + 0.5;
+   if(position % 2 == 1) return ((int)(position / 2)) + 1.0;
+   return ((int)(position / 2)) + 0.5;
 }
 
 /*Converts the the cyclist position to a track index*/
@@ -587,7 +587,7 @@ int input_checker(int argc, char **argv)
 /*All the functions below this line are here for debugging purposes. TODO: delete these when done.*/
 void print_cyclist(Cyclist cyclist)
 {
-   printf("Cyclist #%d | Track Position:  %.1fm | Speed: %d | Lap: %d\n", cyclist.number, (float)cyclist.position, cyclist.speed, cyclist.lap);
+   printf("Cyclist #%d | Track Position:  %.1fm | Speed: %d | Lap: %d\n", cyclist.number, cyclist.position, cyclist.speed, cyclist.lap);
 }
 
 /*Prints the information about the cyclists that are still competing*/

@@ -247,7 +247,7 @@ void move_cyclist(Cyclist *cyclist)
             /*See if this cyclist is eliminated*/
             eliminate_cyclist(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
-            print_cyclist(*cyclist);           
+            print_cyclist(*cyclist);
          }
          else /*He will be able to advance only half a meter*/
          {
@@ -371,7 +371,7 @@ void move(Cyclist *cyclist, int position1, int position2)
 /*Checks is the cyclist in this position will complete a new lap*/
 int lap_complete(int position)
 {
-   if(track_size - 1 == position) return 1;
+   if(track_size-1 == position) return 1;
    return 0;
 }
 
@@ -398,16 +398,15 @@ void *omnium_u(void *args)
    print_cyclist(*cyclist);
    while(!go) continue;
 
-
    while(cyclists_competing != 1) 
    {
       /*Critical section*/
       critical_section(cyclist);
+      await(4000000); /*4ms*/
       while(moved_cyclists != 0) if(cyclist->number == last) last = -1;
       /*Give time to all threads leave the last while*/
-      await(2000000); /*2ms*/
       if(disqualified(cyclist) == 1) break;
-      await(2000000); /*2ms*/
+      await(4000000); /*4ms*/
    }
    broadcast(cyclist);
    return NULL;
@@ -427,20 +426,6 @@ void *omnium_v(void *args)
    }
 
    return NULL;
-}
-
-/*Function to wait x ms.*/
-void await(int x)
-{
-   struct timespec tim, tim2;
-   tim.tv_sec = tim2.tv_sec = 0;
-   tim.tv_nsec = tim2.tv_nsec = x; /*72ms*/
-
-   if (nanosleep(&tim , &tim2) < 0)
-   {
-      printf("Nanosleep failed.\n");
-      exit(-1);
-   }
 }
 
 /*Runs the chronometer. The chronometer also prints on the screen the information about the race.*/
@@ -466,8 +451,21 @@ void *omnium_chronometer(void *args)
       moved_cyclists = 0;
    }
 
-
    return NULL;
+}
+
+/*Function to wait x ms.*/
+void await(int x)
+{
+   struct timespec tim, tim2;
+   tim.tv_sec = tim2.tv_sec = 0;
+   tim.tv_nsec = tim2.tv_nsec = x; /*72ms*/
+
+   if (nanosleep(&tim , &tim2) < 0)
+   {
+      printf("Nanosleep failed.\n");
+      exit(-1);
+   }
 }
 
 /*Countdown for race start. While the countdown is running, cyclists threads are being created.*/

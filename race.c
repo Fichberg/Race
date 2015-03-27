@@ -84,6 +84,10 @@ void increment_lap(Cyclist*);
 void move(Cyclist*, int, int);
 float decide_next_position25(Cyclist*, int);
 float decide_next_position50(Cyclist*, int);
+int disqualified(Cyclist*);
+void eliminate_cyclist(Cyclist*, int, int);
+void eliminate(Cyclist*);
+void broadcast(Cyclist*);
 
 /*Test functions. TODO: delete these when done*/
 void print_track();
@@ -209,11 +213,14 @@ void move_cyclist(Cyclist *cyclist)
          /*This cyclist will be forwarded 0.5m*/
          move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
+         /*swap places of cyclists in case of a total overtaking*/
+         /*TODO*/
+
          /*See if this cyclist will break (1% chance).*/
          /*TODO*/
 
          /*See if this cyclist is eliminated*/
-         /*TODO*/
+         eliminate_cyclist(cyclist, position1, position2);
 
          /*print_cyclist(*cyclist);*/
       }
@@ -231,11 +238,14 @@ void move_cyclist(Cyclist *cyclist)
             /*This cyclist is will be forwarded 0.5m*/
             move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
+            /*swap places of cyclists in case of a total overtaking*/
+            /*TODO*/
+
             /*See if this cyclist will break (1% chance).*/
             /*TODO*/
 
             /*See if this cyclist is eliminated*/
-            /*TODO*/
+            eliminate_cyclist(cyclist, position1, position2);
 
             print_cyclist(*cyclist);           
          }
@@ -247,16 +257,64 @@ void move_cyclist(Cyclist *cyclist)
             /*This cyclist is will be forwarded 1m*/
             move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
+            /*swap places of cyclists in case of a total overtaking*/
+            /*TODO*/
+
             /*See if this cyclist will break (1% chance).*/
             /*TODO*/
 
             /*See if this cyclist is eliminated*/
-            /*TODO*/
+            eliminate_cyclist(cyclist, position1, position2);
 
             print_cyclist(*cyclist);
          }
       }
    }
+}
+
+/*Broadcasts, announcing broken, and eliminated cyclists and the winner of the race*/
+void broadcast(Cyclist *cyclist)
+{
+   if(cyclist->eliminated == 'Y')
+      printf("\n***************************\nThe cyclist %d (%p) has been ELIMINATED.\n***************************\n", cyclist->number, (void*)cyclist);
+   else if(cyclist->broken == 'Y')
+      printf("\n***************************\nThe cyclist %d (%p) has  BROKEN.\n***************************\n", cyclist->number, (void*)cyclist);
+   else
+      printf("\n***************************\nThe cyclist %d (%p) has WON THE RACE.\n***************************\n", cyclist->number, (void*)cyclist);
+}
+
+/*Confirms if the cyclists is out*/
+int disqualified(Cyclist *cyclist)
+{
+   if(cyclist->eliminated == 'Y' || cyclist->broken == 'Y') return 1;
+   return 0;
+}
+
+/*Eliminates the worst cyclist of the lap*/
+void eliminate_cyclist(Cyclist *cyclist, int position1, int position2)
+{
+   /*Confirms positions. Did he really crossed the line?*/
+   if(((position1 == track_size-1) && ((position2 == 0) || (position2 == 1))) || ( position1 == track_size-2 && position2 == 0 ))
+      if((cyclist->lap > 1) && (cyclist->place == cyclists_competing) && (cyclist->broken == 'N'))
+      {
+         /*do eliminate*/
+         eliminate(cyclist);
+      }
+}
+
+/*Marks and eliminated the cyclist from the competition*/
+void eliminate(Cyclist *cyclist)
+{
+   int index = convert_meters_to_index(cyclist->position);
+   /*Look for the cyclist in the track to remove him*/
+   if(track[index].cyclist1 == cyclist) track[index].cyclist1 = NULL;
+   else if(track[index].cyclist2 == cyclist) track[index].cyclist2 = NULL;
+   else if(track[index].cyclist3 == cyclist) track[index].cyclist3 = NULL;
+   else track[index].cyclist4 = NULL;
+   /*Marks him to eliminate him after*/
+   cyclist->eliminated = 'Y';
+   moved_cyclists--; /*to keep balanced the condition in omnium_chronometer*/
+   cyclists_competing--;
 }
 
 /*Decides the next position  for speed = 25 and if he is at track_size-1*/
@@ -268,9 +326,16 @@ float decide_next_position25(Cyclist *cyclist, int position1)
 /*Decides the next position for speed = 50 and if he is at track_size-1 or track_size-2*/
 float decide_next_position50(Cyclist *cyclist, int position1)
 {
-   if(position1 == track_size-1) return 1.0;
-   if(position1 == track_size-2) return 0.5;
-   return cyclist->position + 1.0;
+   /*He can advance 1m*/
+   if(position1 < track_size-2 && track[position1 + 2].cyclists < 4) return cyclist->position + 1.0;
+   else if (position1 == track_size-2 && track[0].cyclists < 4) return 0.5;
+   else if (position1 == track_size-1 && track[1].cyclists < 4) return 1.0;
+   /*He can only advance 0.5m*/
+   else
+   {
+      if(position1 == track_size-1) return 0.5;
+      return cyclist->position + 0.5;  
+   }
 }
 
 /*Moves the cyclist*/
@@ -300,6 +365,7 @@ void move(Cyclist *cyclist, int position1, int position2)
    else if(track[position2].cyclist2 == NULL) track[position2].cyclist2 = cyclist;
    else if(track[position2].cyclist3 == NULL) track[position2].cyclist3 = cyclist;
    else track[position2].cyclist4 = cyclist;
+
 }
 
 /*Checks is the cyclist in this position will complete a new lap*/
@@ -338,10 +404,11 @@ void *omnium_u(void *args)
       /*Critical section*/
       critical_section(cyclist);
       while(moved_cyclists != 0) if(cyclist->number == last) last = -1;
+      if(disqualified(cyclist) == 1) break;
       /*Give time to all threads leave the last while*/
       await(2000000); /*2ms*/
-      
    }
+   broadcast(cyclist);
    return NULL;
 }
 

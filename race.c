@@ -87,8 +87,9 @@ float decide_next_position25(Cyclist*, int);
 float decide_next_position50(Cyclist*, int);
 int disqualified(Cyclist*);
 void eliminate_cyclist(Cyclist*, int, int);
-void eliminate(Cyclist*);
+void eliminate(Cyclist*, char);
 void broadcast(Cyclist*);
+void break_cyclist(Cyclist*);
 
 /*Test functions. TODO: delete these when done*/
 void print_track();
@@ -218,12 +219,12 @@ void move_cyclist(Cyclist *cyclist)
          /*TODO*/
 
          /*See if this cyclist will break (1% chance).*/
-         /*TODO*/
+         break_cyclist(cyclist);
 
          /*See if this cyclist is eliminated*/
          eliminate_cyclist(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
-         /*print_cyclist(*cyclist);*/
+         print_cyclist(*cyclist);
       }
    }
    else /*cyclist->speed == 50*/
@@ -243,7 +244,7 @@ void move_cyclist(Cyclist *cyclist)
             /*TODO*/
 
             /*See if this cyclist will break (1% chance).*/
-            /*TODO*/
+            break_cyclist(cyclist);
 
             /*See if this cyclist is eliminated*/
             eliminate_cyclist(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
@@ -262,13 +263,27 @@ void move_cyclist(Cyclist *cyclist)
             /*TODO*/
 
             /*See if this cyclist will break (1% chance).*/
-            /*TODO*/
+            break_cyclist(cyclist);
 
             /*See if this cyclist is eliminated*/
             eliminate_cyclist(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
             print_cyclist(*cyclist);
          }
+      }
+   }
+}
+
+/*Attempts to break the cyclist*/
+void break_cyclist(Cyclist *cyclist)
+{
+   /*Will not attempt to break him at first lap, but will try to do it every 4 laps, for every position in the track*/
+   /*The remaining last 3 cyclists are immune to break attempts*/
+   if(cyclist->lap > 1 && cyclist->lap % 4 == 1 && cyclists_competing > 3)
+   {
+      if(rand() % 100 == 0)
+      {
+         eliminate(cyclist, 'B');
       }
    }
 }
@@ -299,12 +314,12 @@ void eliminate_cyclist(Cyclist *cyclist, int position1, int position2)
       if((cyclist->lap > 1) && (cyclist->place == cyclists_competing) && (cyclist->broken == 'N'))
       {
          /*do eliminate*/
-         eliminate(cyclist);
+         eliminate(cyclist, 'E');
       }
 }
 
 /*Marks and eliminated the cyclist from the competition*/
-void eliminate(Cyclist *cyclist)
+void eliminate(Cyclist *cyclist, char mark)
 {
    int index = convert_meters_to_index(cyclist->position);
    /*Look for the cyclist in the track to remove him*/
@@ -315,7 +330,8 @@ void eliminate(Cyclist *cyclist)
    /*Others cyclists can advance to this position.*/
    (track[index].cyclists)--;
    /*Marks him to eliminate him after*/
-   cyclist->eliminated = 'Y';
+   if(mark == 'E') cyclist->eliminated = 'Y';
+   else /*mark == 'B'*/ cyclist->broken = 'Y';
    cyclist->race_time = elapsed_time;
 }
 
@@ -395,7 +411,7 @@ void critical_section(Cyclist *cyclist)
    pthread_mutex_lock(&lock);
    if(moved_cyclists == cyclists_competing) {printf("\n"); await(10000000); moved_cyclists = 0;}
    move_cyclist(cyclist);
-   if(cyclist->eliminated == 'N') moved_cyclists++;
+   if(cyclist->eliminated == 'N' && cyclist->broken == 'N') moved_cyclists++;
    else cyclists_competing--;
    pthread_mutex_unlock(&lock);
 }

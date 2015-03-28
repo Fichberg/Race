@@ -90,6 +90,7 @@ void eliminate_cyclist(Cyclist*, int, int);
 void eliminate(Cyclist*, char);
 void broadcast(Cyclist*);
 void break_cyclist(Cyclist*);
+void update_all_cyclists_places(Cyclist*);
 
 /*Test functions. TODO: delete these when done*/
 void print_track();
@@ -274,6 +275,45 @@ void move_cyclist(Cyclist *cyclist)
    }
 }
 
+/*When a cyclist breaks and there are cyclists after him, all cyclists places must be updated. The broken cyclist gets the last place and all the others place + 1*/
+void update_all_cyclists_places(Cyclist *cyclist)
+{
+   /*His track position index*/
+   int start, index = convert_meters_to_index(cyclist->position);
+   int last = cyclist->place;
+   start = index;
+   /*(*track[index].cyclist1).place*/
+   /*swap places in the track from 0 to index*/
+   do {
+      if(track[index].cyclists > 0)
+      {
+         if((track[index].cyclist1 != cyclist) && (track[index].cyclist1 != NULL) && ((*track[index].cyclist1).lap <= cyclist->lap))
+         {
+            if(last < (*track[index].cyclist1).place) last = (*track[index].cyclist1).place;
+            if(cyclist->place < (*track[index].cyclist1).place) (*track[index].cyclist1).place--;
+         }
+         if((track[index].cyclist2 != cyclist) && (track[index].cyclist2 != NULL) && ((*track[index].cyclist2).lap <= cyclist->lap)) 
+         {
+            if(last < (*track[index].cyclist2).place) last = (*track[index].cyclist2).place;
+            if(cyclist->place < (*track[index].cyclist2).place) (*track[index].cyclist2).place--;
+         }
+         if((track[index].cyclist3 != cyclist) && (track[index].cyclist3 != NULL) && ((*track[index].cyclist3).lap <= cyclist->lap)) 
+         {
+            if(last < (*track[index].cyclist3).place) last = (*track[index].cyclist3).place;
+            if(cyclist->place < (*track[index].cyclist3).place) (*track[index].cyclist3).place--;
+         }
+         if((track[index].cyclist4 != cyclist) && (track[index].cyclist4 != NULL) && ((*track[index].cyclist4).lap <= cyclist->lap)) 
+         {
+            if(last < (*track[index].cyclist4).place) last = (*track[index].cyclist4).place;
+            if(cyclist->place < (*track[index].cyclist4).place) (*track[index].cyclist4).place--;
+         }
+      }
+      index--;
+      if(index == -1) index = track_size-1;
+   } while(index != start);
+   cyclist->place = last;
+}
+
 /*Attempts to break the cyclist*/
 void break_cyclist(Cyclist *cyclist)
 {
@@ -283,6 +323,7 @@ void break_cyclist(Cyclist *cyclist)
    {
       if(rand() % 100 == 0)
       {
+         update_all_cyclists_places(cyclist);
          eliminate(cyclist, 'B');
       }
    }
@@ -292,11 +333,11 @@ void break_cyclist(Cyclist *cyclist)
 void broadcast(Cyclist *cyclist)
 {
    if(cyclist->eliminated == 'Y')
-      printf("\n*****************************\nThe cyclist %d (%p) has been ELIMINATED (time: %.3f).\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0));
+      printf("\n*****************************\nThe cyclist %d (%p) has been ELIMINATED (time: %.3f). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0), cyclist->place);
    else if(cyclist->broken == 'Y')
-      printf("\n*****************************\nThe cyclist %d (%p) has  BROKEN (time: %.3f).\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0));
+      printf("\n*****************************\nThe cyclist %d (%p) has  BROKEN (time: %.3f). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0), cyclist->place);
    else
-      printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %.3f).\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0));
+      printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %.3f). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0), cyclist->place);
 }
 
 /*Confirms if the cyclists is out*/
@@ -321,6 +362,7 @@ void eliminate_cyclist(Cyclist *cyclist, int position1, int position2)
 /*Marks and eliminated the cyclist from the competition*/
 void eliminate(Cyclist *cyclist, char mark)
 {
+   /*His track position index*/
    int index = convert_meters_to_index(cyclist->position);
    /*Look for the cyclist in the track to remove him*/
    if(track[index].cyclist1 == cyclist) track[index].cyclist1 = NULL;

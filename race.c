@@ -26,6 +26,7 @@ typedef struct cyclist {
    int lap;          /*His actual lap*/
    char eliminated;  /*is he eliminated?*/
    char broken;      /*did he broke?*/
+   int race_time;    /*Elimination, broken or victory time*/
 } Cyclist;
 
 /*Each position of the track is a cell of type meter*/
@@ -276,11 +277,11 @@ void move_cyclist(Cyclist *cyclist)
 void broadcast(Cyclist *cyclist)
 {
    if(cyclist->eliminated == 'Y')
-      printf("\n***************************\nThe cyclist %d (%p) has been ELIMINATED.\n***************************\n", cyclist->number, (void*)cyclist);
+      printf("\n*****************************\nThe cyclist %d (%p) has been ELIMINATED (time: %.3f).\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0));
    else if(cyclist->broken == 'Y')
-      printf("\n***************************\nThe cyclist %d (%p) has  BROKEN.\n***************************\n", cyclist->number, (void*)cyclist);
+      printf("\n*****************************\nThe cyclist %d (%p) has  BROKEN (time: %.3f).\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0));
    else
-      printf("\n***************************\nThe cyclist %d (%p) has WON THE RACE.\n***************************\n", cyclist->number, (void*)cyclist);
+      printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %.3f).\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0));
 }
 
 /*Confirms if the cyclists is out*/
@@ -315,6 +316,7 @@ void eliminate(Cyclist *cyclist)
    (track[index].cyclists)--;
    /*Marks him to eliminate him after*/
    cyclist->eliminated = 'Y';
+   cyclist->race_time = elapsed_time;
 }
 
 /*Decides the next position  for speed = 25 and if he is at track_size-1*/
@@ -323,6 +325,7 @@ float decide_next_position25(Cyclist *cyclist, int position1)
    if(position1 == track_size-1) return 0.5;
    return cyclist->position + 0.5;
 }
+
 /*Decides the next position for speed = 50 and if he is at track_size-1 or track_size-2*/
 float decide_next_position50(Cyclist *cyclist, int position1)
 {
@@ -341,10 +344,13 @@ float decide_next_position50(Cyclist *cyclist, int position1)
 /*Moves the cyclist*/
 void move(Cyclist *cyclist, int position1, int position2)
 {
+   /*Adjusts number of cyclists in this track cell and the next track cell*/
    (track[position1].cyclists)--;
    (track[position2].cyclists)++;
+   /*Gives the new position to the cyclist*/
    cyclist->position = convert_index_to_meters(position2);
 
+   /*Do not allow more or less cyclists than the expected in a track cell*/
    if((track[position2].cyclists) > MAX_CYCLISTS) 
    {
       printf("\nError. Found more than 4 cyclists in track[%d].\n", position2);
@@ -356,6 +362,7 @@ void move(Cyclist *cyclist, int position1, int position2)
       exit(0);
    }
 
+   /*Dislocated the cyclist*/
    if(track[position1].cyclist1 == cyclist) track[position1].cyclist1 = NULL;
    else if(track[position1].cyclist2 == cyclist) track[position1].cyclist2 = NULL;
    else if(track[position1].cyclist3 == cyclist) track[position1].cyclist3 = NULL;
@@ -366,6 +373,8 @@ void move(Cyclist *cyclist, int position1, int position2)
    else if(track[position2].cyclist3 == NULL) track[position2].cyclist3 = cyclist;
    else track[position2].cyclist4 = cyclist;
 
+   /*Gets the time he did the movement*/
+   cyclist->race_time = elapsed_time;
 }
 
 /*Checks is the cyclist in this position will complete a new lap*/
@@ -553,6 +562,7 @@ void make_cyclists(Cyclist *thread_args, int *initial_config, int initial_speed,
       thread_args[i].lap = 1; /*first lap*/
       thread_args[i].eliminated = 'N';
       thread_args[i].broken = 'N';
+      thread_args[i].race_time = 0;
    }
 }
 

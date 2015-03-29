@@ -91,6 +91,7 @@ void eliminate(Cyclist*, char);
 void broadcast(Cyclist*);
 void break_cyclist(Cyclist*);
 void update_all_cyclists_places(Cyclist*);
+void overtake(Cyclist*, int, int);
 
 /*Test functions. TODO: delete these when done*/
 void print_track();
@@ -217,7 +218,7 @@ void move_cyclist(Cyclist *cyclist)
          move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
          /*swap places of cyclists in case of a total overtaking*/
-         /*TODO*/
+         overtake(cyclist, position1, position2);
 
          /*See if this cyclist will break (1% chance).*/
          break_cyclist(cyclist);
@@ -242,7 +243,7 @@ void move_cyclist(Cyclist *cyclist)
             move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
             /*swap places of cyclists in case of a total overtaking*/
-            /*TODO*/
+            overtake(cyclist, position1, position2);
 
             /*See if this cyclist will break (1% chance).*/
             break_cyclist(cyclist);
@@ -261,7 +262,7 @@ void move_cyclist(Cyclist *cyclist)
             move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
             /*swap places of cyclists in case of a total overtaking*/
-            /*TODO*/
+            overtake(cyclist, position1, position2);
 
             /*See if this cyclist will break (1% chance).*/
             break_cyclist(cyclist);
@@ -271,6 +272,56 @@ void move_cyclist(Cyclist *cyclist)
 
             print_cyclist(*cyclist);
          }
+      }
+   }
+}
+
+/*Swap cyclists places in the case of an overtaking.*/
+/*TODO: GOTTA TEST THIS ONE ONE*/
+void overtake(Cyclist *cyclist, int position1, int position2)
+{
+   int index, temp;
+   for(index = position1; index < position2; index = (index + 1) % track_size)
+   {
+      /*Must update places*/
+      if(track[index].cyclists > 0)
+      {
+         if(track[index].cyclist1 != NULL)
+         {
+            if(((*track[index].cyclist1).place < cyclist->place) && ((*track[index].cyclist1).lap <= cyclist->lap))
+            {
+               temp = cyclist->place;
+               cyclist->place = (*track[index].cyclist1).place;
+               (*track[index].cyclist1).place = temp;
+            }
+         }
+         if(track[index].cyclist2 != NULL)
+         {
+            if(((*track[index].cyclist2).place < cyclist->place) && ((*track[index].cyclist2).lap <= cyclist->lap))
+            {
+               temp = cyclist->place;
+               cyclist->place = (*track[index].cyclist2).place;
+               (*track[index].cyclist2).place = temp;
+            }
+         }
+         if(track[index].cyclist3 != NULL)
+         {
+            if(((*track[index].cyclist3).place < cyclist->place) && ((*track[index].cyclist3).lap <= cyclist->lap))
+            {
+               temp = cyclist->place;
+               cyclist->place = (*track[index].cyclist3).place;
+               (*track[index].cyclist3).place = temp;
+            }
+         }
+         if(track[index].cyclist4 != NULL)
+         {
+            if(((*track[index].cyclist4).place < cyclist->place) && ((*track[index].cyclist4).lap <= cyclist->lap))
+            {
+               temp = cyclist->place;
+               cyclist->place = (*track[index].cyclist4).place;
+               (*track[index].cyclist4).place = temp;
+            }
+         }  
       }
    }
 }

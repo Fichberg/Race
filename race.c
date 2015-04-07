@@ -57,6 +57,8 @@ pthread_mutex_t lock;
 int moved_cyclists;
 /*Global variable. Contains the number of the last cyclist to move*/
 int last;
+/*Global varaible. Mode */
+char mode;
 
 /*Functions declarations*/
 int input_checker(int, char **);
@@ -91,7 +93,8 @@ void eliminate(Cyclist*, char);
 void broadcast(Cyclist*);
 void break_cyclist(Cyclist*);
 void update_all_cyclists_places(Cyclist*);
-void overtake(Cyclist*, int, int);
+void overtake(Cyclist*,int,int);
+int roll_speed ();
 
 /*Test functions. TODO: delete these when done*/
 void print_track();
@@ -212,13 +215,17 @@ void move_cyclist(Cyclist *cyclist)
       if(track[convert_meters_to_index(position2)].cyclists < 4) 
       {
          /*If he is going to complete a lap, increments*/
-         if(lap_complete(convert_meters_to_index(position2))) increment_lap(cyclist);
+         if(lap_complete(convert_meters_to_index(position2))) {
+            increment_lap(cyclist);
+            /*See if his speed will changer (omnium_v only) */
+            if(mode == 'v') cyclist->speed = roll_speed();
+         }
 
          /*This cyclist will be forwarded 0.5m*/
          move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
          /*swap places of cyclists in case of a total overtaking*/
-         overtake(cyclist, position1, position2);
+         overtake(cyclist,convert_meters_to_index(position1),convert_meters_to_index(position2));
 
          /*See if this cyclist will break (1% chance).*/
          break_cyclist(cyclist);
@@ -237,13 +244,17 @@ void move_cyclist(Cyclist *cyclist)
          if(track[convert_meters_to_index(position2)].cyclists < 4) 
          {
             /*If he is going to complete a lap, increments*/
-            if(lap_complete(convert_meters_to_index(position2))) increment_lap(cyclist);
+            if(lap_complete(convert_meters_to_index(position2))) {
+               increment_lap(cyclist);
+               /*See if his speed will changer (omnium_v only) */
+               if(mode == 'v') cyclist->speed = roll_speed(); 
+            }
 
             /*This cyclist is will be forwarded 0.5m*/
             move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
             /*swap places of cyclists in case of a total overtaking*/
-            overtake(cyclist, position1, position2);
+            overtake(cyclist,convert_meters_to_index(position1),convert_meters_to_index(position2));
 
             /*See if this cyclist will break (1% chance).*/
             break_cyclist(cyclist);
@@ -253,16 +264,19 @@ void move_cyclist(Cyclist *cyclist)
 
             print_cyclist(*cyclist);
          }
-         else /*He will be able to advance only half a meter*/
+         else if(track[convert_meters_to_index(position2) - 1].cyclists < 4)
          {
             /*If he is going to complete a lap, increments*/
-            if(lap_complete(convert_meters_to_index(position2))) increment_lap(cyclist);
-            
+            if(lap_complete(convert_meters_to_index(position2))) {
+                increment_lap(cyclist);
+                /*See if his speed will changer (omnium_v only) */
+                if(mode == 'v') cyclist->speed = roll_speed();
+             }         
             /*This cyclist is will be forwarded 1m*/
             move(cyclist, convert_meters_to_index(position1), convert_meters_to_index(position2));
 
             /*swap places of cyclists in case of a total overtaking*/
-            overtake(cyclist, position1, position2);
+            overtake(cyclist,convert_meters_to_index(position1),convert_meters_to_index(position2));
 
             /*See if this cyclist will break (1% chance).*/
             break_cyclist(cyclist);
@@ -272,8 +286,14 @@ void move_cyclist(Cyclist *cyclist)
 
             print_cyclist(*cyclist);
          }
+         /* Note: a cyclist might not move given the circustances */
       }
    }
+}
+
+int roll_speed() {
+
+  return ((rand() % 2) + 1) * 25; 
 }
 
 /*Swap cyclists places in the case of an overtaking.*/
@@ -282,7 +302,7 @@ void overtake(Cyclist *cyclist, int position1, int position2)
 {
    int index, temp;
    for(index = position1; index < position2; index = (index + 1) % track_size)
-   {
+   { 
       /*Must update places*/
       if(track[index].cyclists > 0)
       {
@@ -486,6 +506,11 @@ void move(Cyclist *cyclist, int position1, int position2)
    cyclist->race_time = elapsed_time;
 }
 
+/* Moves the cyclist, but taking in acount it's speed*/
+/*void move_v_omnium (Cyclist *cyclist, int position1, int position2, int position3) {
+
+} */
+
 /*Checks is the cyclist in this position will complete a new lap*/
 int lap_complete(int position)
 {
@@ -539,9 +564,12 @@ void *omnium_v(void *args)
 
    while(cyclists_competing != 1) 
    {
-      continue;
+      critical_section(cyclist);
+      if(disqualified(cyclist) == 1) break;
+      await(72000000);
+      while(moved_cyclists != cyclists_competing) continue;
    }
-
+   broadcast(cyclist);
    return NULL;
 }
 
@@ -692,12 +720,13 @@ float convert_index_to_meters(int position)
 {
    if(position % 2 == 1) return ((int)(position / 2)) + 1.0;
    return ((int)(position / 2)) + 0.5;
+
 }
 
 /*Converts the the cyclist position to a track index*/
 int convert_meters_to_index(float position)
 {
-   return (int)((position * 2) - 1);
+    return (int)((position * 2) - 1);
 }
 
 /*Organize the cyclists by their number in a random order*/
@@ -731,7 +760,12 @@ char get_mode(char **argv)
       printf("Mode argument is expected to be 'u' or 'v'.\n");
       exit(-1);
    }
-   if(strcasecmp(argv[3], "u") == 0) return 'u';
+   if(strcasecmp(argv[3], "u") == 0) {
+     mode = 'u'; 
+     return 'u'; 
+   }
+
+   mode = 'v';
    return 'v';
 }
 

@@ -60,6 +60,8 @@ int moved_cyclists;
 int last;
 /*Global varaible. Mode */
 char mode;
+/*Global variable. Contains the cyclists (using his race position) that might break*/
+int try_to_break;
 
 /*Functions declarations*/
 int input_checker(int, char **);
@@ -93,6 +95,7 @@ void break_cyclist(Cyclist*);
 void update_all_cyclists_places(Cyclist*);
 void overtake(Cyclist*, int);
 int roll_speed ();
+int roll_cyclist_to_try_to_break();
 
 /*Test functions. TODO: delete these when done*/
 void print_track();
@@ -139,6 +142,7 @@ int main(int argc, char **argv)
 
    /*Initialize global variable*/
    moved_cyclists = 0;
+   try_to_break = -1;
 
    /*Allocates the track*/
    make_track();
@@ -222,8 +226,11 @@ void move_cyclist(Cyclist *cyclist)
       if(track[(int)position2].cyclists < 4) 
       {
          /*If he is going to complete a lap, increments*/
-         if(lap_complete((int)position2)) {
+         if(lap_complete((int)position2)) 
+         {
             increment_lap(cyclist);
+            /*If he is at the first position in the race and his lap is a multiple of 4, choose a cyclist to try to break*/
+            if(cyclist->place == 1 && cyclist->lap % 4 == 1) try_to_break = roll_cyclist_to_try_to_break();
             /*Attempts to change cyclist speed (omnium_v only) */
             if(mode == 'v') cyclist->speed = roll_speed();
          }
@@ -235,7 +242,11 @@ void move_cyclist(Cyclist *cyclist)
          overtake(cyclist, (int)position1);
 
          /*See if this cyclist will break (1% chance).*/
-         break_cyclist(cyclist);
+         if(try_to_break == cyclist->place) 
+     	 {
+            break_cyclist(cyclist);
+            try_to_break = -1;
+         }
 
          /*See if this cyclist is eliminated*/
          eliminate_cyclist(cyclist, (int)position1, (int)position2);
@@ -249,16 +260,24 @@ void move_cyclist(Cyclist *cyclist)
       overtake(cyclist, (int)position1);      
 
       /*See if this cyclist will break (1% chance).*/
-      break_cyclist(cyclist);
+      if(try_to_break == cyclist->place) 
+      {
+        break_cyclist(cyclist);
+        try_to_break = -1;
+      }
 
       print_cyclist(*cyclist);
    }
 }
 
+int roll_cyclist_to_try_to_break()
+{
+	return ((rand() % cyclists_competing) + 1);	
+}
+
 /*Attempts to change cyclist speed*/
 int roll_speed() 
 {
-
   return ((rand() % 2) + 1) * 25; 
 }
 
@@ -349,9 +368,8 @@ void update_all_cyclists_places(Cyclist *cyclist)
 /*Attempts to break the cyclist*/
 void break_cyclist(Cyclist *cyclist)
 {
-   /*Will not attempt to break him at first lap, but will try to do it every 4 laps, for every position in the track*/
    /*The remaining last 3 cyclists are immune to break attempts*/
-   if(cyclist->lap > 1 && cyclist->lap % 4 == 1 && cyclists_competing > 3)
+   if(cyclist->lap > 1 && cyclists_competing > 3)
    {
       if(rand() % 100 == 0)
       {

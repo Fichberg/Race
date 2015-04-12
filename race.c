@@ -270,6 +270,7 @@ void move_cyclist(Cyclist *cyclist)
    }
 }
 
+/*Rolls a number, where this number is the position of a cyclist in the race. This number determines who will suffer a break attempt*/
 int roll_cyclist_to_try_to_break()
 {
 	return ((rand() % cyclists_competing) + 1);	

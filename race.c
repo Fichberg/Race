@@ -18,15 +18,15 @@
 
 /*struct containing the attributes of a cyclist*/
 typedef struct cyclist { 
-   int number;       /*Cyclist number*/
-   int position;   /*Position in the track. [0...track_size-1]. Position is printed as*/
-   int place;        /*His place of the race (1 for first, 2 for second... cyclist_competing for last (in actual lap))*/
-   int speed;        /*Cyclist speed. 25km/h or 50km/h*/
-   int lap;          /*His actual lap*/
-   char eliminated;  /*is he eliminated?*/
-   char broken;      /*did he broke?*/
-   int race_time;    /*Elimination, broken or victory time*/
-   float half;       /*Stores extra position for speed = 25*/
+   int number;                /*Cyclist number*/
+   int position;              /*Position in the track. [0...track_size-1]. Position is printed as*/
+   int place;                 /*His place of the race (1 for first, 2 for second... cyclist_competing for last (in actual lap))*/
+   int speed;                 /*Cyclist speed. 25km/h or 50km/h*/
+   int lap;                   /*His actual lap*/
+   char eliminated;           /*is he eliminated?*/
+   char broken;               /*did he broke?*/
+   unsigned int race_cycles;    /*Elimination, broken or victory time*/
+   float half;                /*Stores extra position for speed = 25*/
 } Cyclist;
 
 /*Each position of the track is a cell of type meter*/
@@ -47,8 +47,8 @@ typedef Meter* Track;
 cyclists_competing stores the number of cyclists still running (i.e not broken and not eliminated). 
 total_cyclists stores the total number of cyclists, passed through command line*/
 int cyclists_competing, total_cyclists;
-/*Global variable related to time. Contains the race time duration*/
-int elapsed_time;
+/*Global variable related to time. Contains the race time duration (cycles * 0.72)ms*/
+unsigned int cycles;
 /*Global variables related to the track. 
 track represents the track (an array of struct meter)
 track_size contains the size of the track. It goes from [0...track_size-1]*/
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
    go = 0;
 
    /*Race chronometer*/
-   elapsed_time = 0;
+   cycles = 0;
 
    /*Sets the size of the track*/
    /*Multiplied by 2 because cyclist can move 0.5m when they are with a speed of 25km/h*/
@@ -304,7 +304,7 @@ void mark_cyclist(Cyclist *cyclist, char mark)
    /*Marks the cyclists to eliminate him later*/
    if(mark == 'E') cyclist->eliminated = 'Y';
    else /*mark == 'B'*/ cyclist->broken = 'Y';
-   cyclist->race_time = elapsed_time;
+   cyclist->race_cycles = cycles;
 }
 
 /*Checks is the cyclist in this position will complete a new lap*/
@@ -342,7 +342,7 @@ void write_cyclist(Cyclist *cyclist, int new_position)
    /*Assigns the new position to the cyclist*/
    cyclist->position = new_position;
    /*Assigns the time he did the movement*/
-   cyclist->race_time = elapsed_time;
+   cyclist->race_cycles = cycles;
 }
 
 /*Erases the cyclists from his old track position*/
@@ -389,11 +389,11 @@ int disqualified(Cyclist *cyclist)
 void broadcast(Cyclist *cyclist)
 {
    if(cyclist->eliminated == 'Y')
-      printf("\n*****************************\nThe cyclist %d (%p) has been ELIMINATED (time: %.3f). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0), cyclist->place);
+      printf("\n*****************************\nThe cyclist %d (%p) has been ELIMINATED (time: %.3fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, ((cyclist->race_cycles * 0.72 )/ 100.0), cyclist->place);
    else if(cyclist->broken == 'Y')
-      printf("\n*****************************\nThe cyclist %d (%p) has BROKEN (time: %.3f). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0), cyclist->place);
+      printf("\n*****************************\nThe cyclist %d (%p) has BROKEN (time: %.3fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, ((cyclist->race_cycles * 0.72 )/ 100.0), cyclist->place);
    else
-      printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %.3f). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_time / 100.0), cyclist->place);
+      printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %.3fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, ((cyclist->race_cycles * 0.72 )/ 100.0), cyclist->place);
 }
 
 /*Omnium race function in 'u' mode*/
@@ -460,7 +460,6 @@ void *omnium_v(void *args)
 void *omnium_chronometer(void *args)
 {
    Cyclist *all_cyclists = args;
-   int milliseconds_adder = 72;
 
    /*Race will start. After countdown(), all cyclist threads will be unlocked.*/
    countdown();
@@ -476,7 +475,7 @@ void *omnium_chronometer(void *args)
       /*TODO: DEBUG MODE HERE IN THIS LINE*/
       print_cyclists(all_cyclists);
       go = START;
-      elapsed_time += milliseconds_adder;
+      cycles++;
    }
    return NULL;
 }
@@ -549,7 +548,7 @@ void make_cyclists(Cyclist *thread_args, int *initial_config, int initial_speed,
       thread_args[i].lap = 1; /*first lap*/
       thread_args[i].eliminated = 'N';
       thread_args[i].broken = 'N';
-      thread_args[i].race_time = 0;
+      thread_args[i].race_cycles = 0;
       thread_args[i].half = 0;
    }
 }

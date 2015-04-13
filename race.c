@@ -472,8 +472,8 @@ void *omnium_chronometer(void *args)
       await(72000000);
       /*Update places in case of a break*/
       if(update == 1) update_places(all_cyclists);
-      /*TODO: DEBUG MODE HERE IN THIS LINE*/
-      print_cyclists(all_cyclists);
+      /*DEBUG MODE*/
+      if((mode == 'U' || mode == 'V') && cycles % 20 == 0) print_cyclists(all_cyclists);
       go = START;
       cycles++;
    }

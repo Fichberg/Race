@@ -1,70 +1,41 @@
-OMNIUM LOG
+OMNIUM LOG (Mode = v):
 
-Lap 1 :
-Cyclist #4 has terminated this lap in position 17 of 20.
-Cyclist #8 has terminated this lap in position 19 of 20.
-Cyclist #14 has terminated this lap in position 20 of 20. -> ELIMINATED.
-
-Lap 2 :
-Cyclist #1 has terminated this lap in position 17 of 20.
-Cyclist #4 has terminated this lap in position 18 of 20.
-Cyclist #8 has terminated this lap in position 19 of 20. -> ELIMINATED.
-
-Lap 3 :
-Cyclist #15 has been knocked out. His final standing is 17 of 20. -> BROKEN.
-Cyclist #2 has terminated this lap in position 15 of 20.
-Cyclist #2 has terminated this lap in position 15 of 20.
-Cyclist #4 has terminated this lap in position 18 of 20. -> ELIMINATED.
-
-Lap 4 :
-Cyclist #3 has terminated this lap in position 13 of 20.
-Cyclist #5 has terminated this lap in position 14 of 20.
-Cyclist #1 has terminated this lap in position 16 of 20. -> ELIMINATED.
-
-Lap 5 :
-Cyclist #6 has terminated this lap in position 12 of 20.
-Cyclist #5 has terminated this lap in position 13 of 20.
-Cyclist #2 has terminated this lap in position 15 of 20. -> ELIMINATED.
-
-Lap 6 :
-Cyclist #7 has terminated this lap in position 11 of 20.
-Cyclist #6 has terminated this lap in position 12 of 20.
-Cyclist #3 has terminated this lap in position 14 of 20. -> ELIMINATED.
-
-Lap 7 :
-Cyclist #11 has terminated this lap in position 10 of 20.
-Cyclist #7 has terminated this lap in position 12 of 20.
-Cyclist #5 has terminated this lap in position 13 of 20. -> ELIMINATED.
-
-Lap 8 :
-Cyclist #7 has been knocked out. His final standing is 12 of 20. -> BROKEN.
-Cyclist #12 has terminated this lap in position 7 of 20.
-Cyclist #11 has terminated this lap in position 8 of 20.
-Cyclist #6 has terminated this lap in position 11 of 20. -> ELIMINATED.
-
-Lap 9 :
-Cyclist #20 has terminated this lap in position 5 of 20.
-Cyclist #11 has terminated this lap in position 8 of 20.
-Cyclist #10 has terminated this lap in position 9 of 20. -> ELIMINATED.
-
-Lap 10 :
-Cyclist #17 has terminated this lap in position 4 of 20.
-Cyclist #12 has terminated this lap in position 6 of 20.
-Cyclist #13 has terminated this lap in position 7 of 20. -> ELIMINATED.
-
-Lap 11 :
-Cyclist #16 has terminated this lap in position 3 of 20.
-Cyclist #20 has terminated this lap in position 5 of 20.
-Cyclist #12 has terminated this lap in position 6 of 20. -> ELIMINATED.
-
-Lap 12 :
-Cyclist #19 has terminated this lap in position 1 of 20.
-Cyclist #17 has terminated this lap in position 4 of 20.
-Cyclist #20 has terminated this lap in position 5 of 20. -> ELIMINATED.
+LOSERS OF LAP 1:
+Cyclist #3 has terminated this lap in position 7 of 10.
+Cyclist #1 has terminated this lap in position 9 of 10.
+Cyclist #9 has terminated this lap in position 10 of 10. -> ELIMINATED.
+LOSERS OF LAP 2:
+Cyclist #5 has terminated this lap in position 6 of 10.
+Cyclist #4 has terminated this lap in position 8 of 10.
+Cyclist #2 has terminated this lap in position 9 of 10. -> ELIMINATED.
+LOSERS OF LAP 3:
+Cyclist #5 has terminated this lap in position 2 of 10.
+Cyclist #8 has terminated this lap in position 7 of 10.
+Cyclist #4 has terminated this lap in position 8 of 10. -> ELIMINATED.
+LOSERS OF LAP 4:
+Cyclist #3 has terminated this lap in position 5 of 10.
+Cyclist #10 has terminated this lap in position 6 of 10.
+Cyclist #8 has terminated this lap in position 7 of 10. -> ELIMINATED.
+LOSERS OF LAP 5:
+Cyclist #7 has terminated this lap in position 3 of 10.
+Cyclist #3 has terminated this lap in position 5 of 10.
+Cyclist #10 has terminated this lap in position 6 of 10. -> ELIMINATED.
+LOSERS OF LAP 6:
+Cyclist #7 has terminated this lap in position 3 of 10.
+Cyclist #6 has terminated this lap in position 4 of 10.
+Cyclist #3 has terminated this lap in position 5 of 10. -> ELIMINATED.
+LOSERS OF LAP 7:
+Cyclist #5 has terminated this lap in position 2 of 10.
+Cyclist #6 has terminated this lap in position 3 of 10.
+Cyclist #7 has terminated this lap in position 4 of 10. -> ELIMINATED.
+LOSERS OF LAP 8:
+Cyclist #1 has terminated this lap in position 1 of 10.
+Cyclist #1 has terminated this lap in position 1 of 10.
+Cyclist #6 has terminated this lap in position 3 of 10. -> ELIMINATED.
 
 
 OMNIUM WINNERS:
 
-1st place: Cyclist #19.
-2nd place: Cyclist #18.
-3rd place: Cyclist #16.
+1st place: Cyclist #1.
+2nd place: Cyclist #5.
+3rd place: Cyclist #6.

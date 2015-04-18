@@ -74,13 +74,12 @@ int set_cyclists(int *, int, int, int, int);
 void make_track();
 void make_cyclists(Cyclist*, int*, int, int);
 void put_cyclists_in_track(Cyclist*, int);
-void create_threads(int, char, pthread_t*, Cyclist*);
+void create_threads(int, pthread_t*, Cyclist*);
 void join_threads(int, pthread_t*);
 void create_time_thread(pthread_t);
 void join_time_thread(pthread_t);
 void join_log_thread(pthread_t);
-void *omnium_u(void*);
-void *omnium_v(void*);
+void *omnium(void*);
 void *omnium_chronometer(void*);
 void *omnium_logger(void*);
 void countdown();
@@ -108,7 +107,7 @@ void write_log_break_info(Cyclist *cyclist);
 
 int main(int argc, char **argv)
 {
-   int cyclists, *initial_config;
+   int cyclists, *initial_config, initial_speed;
    /*threads array. Each cyclist is a thread.*/
    pthread_t *my_threads;
    /*thread in charge of the time elapsed in the simulation*/
@@ -119,6 +118,9 @@ int main(int argc, char **argv)
    /*Get initial information to feed the program*/
    total_cyclists = cyclists_competing = cyclists = input_checker(argc, argv);
    mode = get_mode(argv);
+   if(mode == 'u' || mode == 'U') initial_speed = 50;
+   else initial_speed = 25;
+
 
    /*Starting order of the cyclists is in the array initial_config[0...cyclists-1]. Each cyclist is recognized by its unique number*/
    initial_config = initial_configuration(cyclists);
@@ -152,51 +154,28 @@ int main(int argc, char **argv)
 
    /*Allocates the track*/
    make_track();
-   /*Now the program must run the selected mode*/
-   if(mode == 'u' || mode == 'U')
+
+   /*Now the program is ready to go*/
+   printf("\nPlacing competitors...\n\n");
+   sleep(1);
+   make_cyclists(thread_args, initial_config, initial_speed, cyclists);
+   put_cyclists_in_track(thread_args, cyclists);
+   print_cyclists(thread_args);
+   create_threads(cyclists, my_threads, thread_args);
+   sleep(1);
+   printf("\nAdjusting chronometer... ");
+   sleep(3);
+   if (pthread_create(&time_thread, NULL, omnium_chronometer, thread_args)) 
    {
-      printf("\nPlacing competitors...\n\n");
-      sleep(1);
-      make_cyclists(thread_args, initial_config, 50, cyclists);
-      put_cyclists_in_track(thread_args, cyclists);
-      print_cyclists(thread_args);
-      create_threads(cyclists, mode, my_threads, thread_args);
-      sleep(1);
-      printf("\nAdjusting chronometer... ");
-      sleep(3);
-      if (pthread_create(&time_thread, NULL, omnium_chronometer, thread_args)) 
-      {
-         printf("Error creating time thread.");
-         abort();
-      }
-      if (pthread_create(&log_thread, NULL, omnium_logger, thread_args)) 
-      {
-         printf("Error creating log thread.");
-         abort();
-      } 
+      printf("Error creating time thread.");
+      abort();
    }
-   else
+   if (pthread_create(&log_thread, NULL, omnium_logger, thread_args)) 
    {
-      printf("\nPlacing competitors...\n\n");
-      sleep(1);
-      make_cyclists(thread_args, initial_config, 25, cyclists);
-      put_cyclists_in_track(thread_args, cyclists);
-      print_cyclists(thread_args);
-      create_threads(cyclists, mode, my_threads, thread_args);
-      sleep(1);
-      printf("\nAdjusting chronometer...\n\n");
-      sleep(3);
-      if (pthread_create(&time_thread, NULL, omnium_chronometer, thread_args)) 
-      {
-         printf("Error creating time thread.");
-         abort();
-      }
-      if (pthread_create(&log_thread, NULL, omnium_logger, thread_args)) 
-      {
-         printf("Error creating log thread.");
-         abort();
-      } 
-   }
+      printf("Error creating log thread.");
+      abort();
+   } 
+
    join_time_thread(time_thread);
    join_log_thread(log_thread);
    join_threads(cyclists, my_threads);
@@ -461,8 +440,8 @@ void broadcast(Cyclist *cyclist)
       printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %.2fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_cycles * 0.72 ), cyclist->place);
 }
 
-/*Omnium race function in 'u' mode*/
-void *omnium_u(void *args)
+/*Omnium race function. Each thread is representing a cyclist in omnium*/
+void *omnium(void *args)
 {
    int new_position, old_position;
    Cyclist *cyclist = ((Cyclist*) args);
@@ -495,40 +474,6 @@ void *omnium_u(void *args)
    return NULL;
 }
 
-/*Omnium race function in 'v' mode*/
-void *omnium_v(void *args)
-{
-   int new_position, old_position;
-   Cyclist *cyclist = ((Cyclist*) args);
-
-   old_position = cyclist->position;
-   while(!go) continue;
-
-   for(new_position = decide_new_position(cyclist); cyclists_competing != 1; new_position = decide_new_position(cyclist)) 
-   {
-      if(old_position != new_position) 
-      {
-         sem_wait(&track[new_position].mutex);
-         critical_section(cyclist, old_position, new_position);
-         sem_post(&track[old_position].mutex);
-         old_position = new_position;
-      }
-      await(10000000);
-      go = STOP;
-      while(!go) continue;
-      if(disqualified(cyclist) == 1) break;
-   }
-
-   sem_post(&track[new_position].mutex);
-   broadcast(cyclist);
-
-   pthread_mutex_lock(&elimination_lock);
-      if(already_eliminated == 1) already_eliminated = 0;
-   pthread_mutex_unlock(&elimination_lock);
-
-   return NULL;
-}
-
 /*Runs the chronometer. The chronometer also prints on the screen the information about the race.*/
 void *omnium_chronometer(void *args)
 {
@@ -546,7 +491,7 @@ void *omnium_chronometer(void *args)
       /*Update places in case of a break*/
       if(update == 1) update_places(all_cyclists);
       /*DEBUG MODE*/
-      if((mode == 'U' || mode == 'V') && cycles % 20 == 0) print_cyclists(all_cyclists);
+      if((mode == 'U' || mode == 'V') /*&& cycles % 20 == 0*/) print_cyclists(all_cyclists);
       go = START;
       cycles++;
    }
@@ -563,7 +508,7 @@ void *omnium_logger(void *args)
    pfile = fopen("output/race.log", "w");
 
    /*Writes the first lap in the output*/
-   fputs("OMNIUM LOG\n\n", pfile); 
+   fputs("OMNIUM LOG (Mode = ", pfile); fputc(mode, pfile); fputs("):\n\n", pfile);
 
    while(cyclists_competing != 1)
    {
@@ -571,9 +516,9 @@ void *omnium_logger(void *args)
       /*Writes info in the log: eliminated cyclists and the remaining last 2 cyclists. Also, writed next lap info.*/
       if(track[special_position].cyclist1 != NULL && track[special_position].cyclist2 != NULL && track[special_position].cyclist3 != NULL)
       {
-         fputs("LOSERS OF LAP:", pfile);
+         fputs("LOSERS OF LAP ", pfile);
          sprintf(str, "%d", lap++); fputs(str, pfile);
-         fputs(" :\n", pfile);
+         fputs(":\n", pfile);
 
          fputs("Cyclist #", pfile);
          sprintf(str, "%d", (*track[special_position].cyclist1).number); fputs(str, pfile);
@@ -607,9 +552,9 @@ void *omnium_logger(void *args)
       /*Writes info in the log: broken cyclist*/
       if(track[special_position].cyclist4 != NULL)
       {
-         fputs("KNOCKED OUT IN LAP:", pfile);
+         fputs("KNOCKED OUT IN LAP ", pfile);
          sprintf(str, "%d", lap); fputs(str, pfile);
-         fputs(" :\n", pfile);
+         fputs(":\n", pfile);
 
          fputs("Cyclist #", pfile);
          sprintf(str, "%d", (*track[special_position].cyclist4).number); fputs(str, pfile);
@@ -793,29 +738,15 @@ void join_log_thread(pthread_t log_thread)
 }
 
 /*Function to create all Cyclists threads*/
-void create_threads(int cyclists, char mode, pthread_t *my_threads, Cyclist *thread_args)
+void create_threads(int cyclists, pthread_t *my_threads, Cyclist *thread_args)
 {
    int i;
-   if(mode == 'u' || mode == 'U')
+   for(i = 0; i < cyclists; i++)
    {
-      for(i = 0; i < cyclists; i++)
+      if (pthread_create(&my_threads[i], NULL, omnium, &thread_args[i])) 
       {
-         if (pthread_create(&my_threads[i], NULL, omnium_u, &thread_args[i])) 
-         {
-            printf("Error creating thread.");
-            abort();
-         }
-      }  
-   }
-   else
-   {
-      for(i = 0; i < cyclists; i++)
-      {
-         if (pthread_create(&my_threads[i], NULL, omnium_v, &thread_args[i])) 
-         {
-            printf("Error creating thread.");
-            abort();
-         }
+         printf("Error creating thread.");
+         abort();
       }
    }
 }

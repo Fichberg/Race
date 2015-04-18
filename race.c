@@ -62,6 +62,9 @@ char mode;
 try_to_break contains the cyclist (using his race position, aka cyclist->place) that will suffer a break attempt.
 update is used to allow the simulation to update all cyclists race position, given a cyclist has broken*/
 int try_to_break, update;
+/*Global variable: gives permission to eliminate a cyclists. This is to avoid double elimination (when there's a tie in the last position*/
+int already_eliminated;
+pthread_mutex_t elimination_lock;
 
 /*Functions prototypes*/
 int roll_speed();
@@ -75,9 +78,11 @@ void create_threads(int, char, pthread_t*, Cyclist*);
 void join_threads(int, pthread_t*);
 void create_time_thread(pthread_t);
 void join_time_thread(pthread_t);
+void join_log_thread(pthread_t);
 void *omnium_u(void*);
 void *omnium_v(void*);
 void *omnium_chronometer(void*);
+void *omnium_logger(void*);
 void countdown();
 void await(int);
 int disqualified(Cyclist*);
@@ -98,6 +103,8 @@ void update_places(Cyclist*);
 int input_checker(int, char **);
 char get_mode(char **);
 void destroy_locks_and_semaphores();
+void write_log_elimination_info(Cyclist*);
+void write_log_break_info(Cyclist *cyclist);
 
 int main(int argc, char **argv)
 {
@@ -105,7 +112,7 @@ int main(int argc, char **argv)
    /*threads array. Each cyclist is a thread.*/
    pthread_t *my_threads;
    /*thread in charge of the time elapsed in the simulation*/
-   pthread_t time_thread;
+   pthread_t time_thread, log_thread;
    /*Thread arguments is the cyclist struct*/
    Cyclist *thread_args;
 
@@ -135,6 +142,14 @@ int main(int argc, char **argv)
    try_to_break = total_cyclists + 1;
    update = 0;
 
+   /*Initialize global variables related to elimination functionality*/
+   already_eliminated = 0;
+   if (pthread_mutex_init(&elimination_lock, NULL) != 0)
+   {
+      printf("\nElimination MUTEX initialization failed.\n");
+      exit(1);
+   }
+
    /*Allocates the track*/
    make_track();
    /*Now the program must run the selected mode*/
@@ -154,6 +169,11 @@ int main(int argc, char **argv)
          printf("Error creating time thread.");
          abort();
       }
+      if (pthread_create(&log_thread, NULL, omnium_logger, thread_args)) 
+      {
+         printf("Error creating log thread.");
+         abort();
+      } 
    }
    else
    {
@@ -170,14 +190,21 @@ int main(int argc, char **argv)
       {
          printf("Error creating time thread.");
          abort();
-      }  
+      }
+      if (pthread_create(&log_thread, NULL, omnium_logger, thread_args)) 
+      {
+         printf("Error creating log thread.");
+         abort();
+      } 
    }
    join_time_thread(time_thread);
+   join_log_thread(log_thread);
    join_threads(cyclists, my_threads);
    free(initial_config);
    free(my_threads);
    free(thread_args);
    destroy_locks_and_semaphores();
+   pthread_mutex_destroy(&elimination_lock);
    free(track);
    return 0;
 }
@@ -214,6 +241,7 @@ void new_lap(Cyclist *cyclist, int new_position)
 
       /*Eliminate the cyclist is he is the worst in the competition*/
       eliminate_cyclist(cyclist, new_position);
+      write_log_elimination_info(cyclist);
 
       /*If he is at the first position in the race and his lap is a multiple of 4, choose a cyclist to try to break*/
       if(cyclist->lap > 1 && cyclist->place == 1 && cyclist->lap % 4 == 1) try_to_break = roll_cyclist_to_try_to_break();      
@@ -224,6 +252,33 @@ void new_lap(Cyclist *cyclist, int new_position)
       /*Attempts to change cyclist speed (omnium_v only) */
       if(mode == 'v' || mode == 'V') cyclist->speed = roll_speed();
    }
+}
+
+void write_log_elimination_info(Cyclist *cyclist)
+{
+   int special_position = track_size;
+   pthread_mutex_lock(&track[special_position].meter_lock);
+   if(cyclist->place == cyclists_competing - 2) 
+   {
+      if(track[special_position].cyclist1 == NULL) { track[special_position].cyclist1 = cyclist; (track[special_position].cyclists)++; }
+   }
+   if(cyclist->place == cyclists_competing - 1)
+   {
+      if(track[special_position].cyclist2 == NULL) { track[special_position].cyclist2 = cyclist; (track[special_position].cyclists)++; }
+   }
+   if(cyclist->place == cyclists_competing)
+   {
+      if(track[special_position].cyclist3 == NULL) { track[special_position].cyclist3 = cyclist; (track[special_position].cyclists)++; }
+   }
+   pthread_mutex_unlock(&track[special_position].meter_lock);
+}
+
+void write_log_break_info(Cyclist *cyclist)
+{
+   int special_position = track_size;
+   pthread_mutex_lock(&track[special_position].meter_lock);
+      if(track[special_position].cyclist4 == NULL) { track[special_position].cyclist4 = cyclist; (track[special_position].cyclists)++; }
+   pthread_mutex_unlock(&track[special_position].meter_lock);
 }
 
 /*Attempts to break the cyclist*/
@@ -237,9 +292,11 @@ void break_cyclist(Cyclist *cyclist)
       { 
          mark_cyclist(cyclist, 'B');
          /*He broke. He is now in the last place of this lap*/
-         cyclist->place = cyclists_competing; 
+         cyclist->place = cyclists_competing;
          /*Calls for update cyclists places because someone broke*/
          update = 1; 
+         /*Write in the special position of the track this cyclist will break*/
+         write_log_break_info(cyclist);
       }
    }
 }
@@ -295,7 +352,15 @@ void eliminate_cyclist(Cyclist *cyclist, int new_position)
 {
    /*Confirms positions. Did he really crossed the line and it's the worst cyclist in the race?*/
    if((new_position == 0) && (cyclist->place == cyclists_competing))
-      mark_cyclist(cyclist, 'E');
+   {
+      pthread_mutex_lock(&elimination_lock);
+      if(already_eliminated == 0)
+      {
+         already_eliminated = 1;
+         mark_cyclist(cyclist, 'E');
+      }
+      pthread_mutex_unlock(&elimination_lock);
+   }
 }
 
 /*Marks the cyclist to be eliminated from the competition*/
@@ -389,11 +454,11 @@ int disqualified(Cyclist *cyclist)
 void broadcast(Cyclist *cyclist)
 {
    if(cyclist->eliminated == 'Y')
-      printf("\n*****************************\nThe cyclist %d (%p) has been ELIMINATED (time: %.3fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, ((cyclist->race_cycles * 0.72 )/ 100.0), cyclist->place);
+      printf("\n*****************************\nThe cyclist %d (%p) has been ELIMINATED (time: %.2fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_cycles * 0.72 ), cyclist->place);
    else if(cyclist->broken == 'Y')
-      printf("\n*****************************\nThe cyclist %d (%p) has BROKEN (time: %.3fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, ((cyclist->race_cycles * 0.72 )/ 100.0), cyclist->place);
+      printf("\n*****************************\nThe cyclist %d (%p) has BROKEN (time: %.2fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_cycles * 0.72 ), cyclist->place);
    else
-      printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %.3fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, ((cyclist->race_cycles * 0.72 )/ 100.0), cyclist->place);
+      printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %.2fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_cycles * 0.72 ), cyclist->place);
 }
 
 /*Omnium race function in 'u' mode*/
@@ -422,6 +487,10 @@ void *omnium_u(void *args)
 
    sem_post(&track[new_position].mutex);
    broadcast(cyclist);
+
+   pthread_mutex_lock(&elimination_lock);
+      already_eliminated = 0;
+   pthread_mutex_unlock(&elimination_lock);
 
    return NULL;
 }
@@ -453,6 +522,10 @@ void *omnium_v(void *args)
    sem_post(&track[new_position].mutex);
    broadcast(cyclist);
 
+   pthread_mutex_lock(&elimination_lock);
+      if(already_eliminated == 1) already_eliminated = 0;
+   pthread_mutex_unlock(&elimination_lock);
+
    return NULL;
 }
 
@@ -479,6 +552,97 @@ void *omnium_chronometer(void *args)
    }
    return NULL;
 }
+
+void *omnium_logger(void *args)
+{
+   FILE *pfile;
+   int i, lap = 1, special_position = track_size, order[3];
+   char str[256];
+   Cyclist *all_cyclists = args;
+   
+   pfile = fopen("output/race.log", "w");
+
+   /*Writes the first lap in the output*/
+   fputs("OMNIUM LOG\n\n", pfile); 
+
+   while(cyclists_competing != 1)
+   {
+      pthread_mutex_lock(&track[special_position].meter_lock);
+      /*Writes info in the log: eliminated cyclists and the remaining last 2 cyclists. Also, writed next lap info.*/
+      if(track[special_position].cyclist1 != NULL && track[special_position].cyclist2 != NULL && track[special_position].cyclist3 != NULL)
+      {
+         fputs("LOSERS OF LAP:", pfile);
+         sprintf(str, "%d", lap++); fputs(str, pfile);
+         fputs(" :\n", pfile);
+
+         fputs("Cyclist #", pfile);
+         sprintf(str, "%d", (*track[special_position].cyclist1).number); fputs(str, pfile);
+         fputs(" has terminated this lap in position ", pfile);
+         sprintf(str, "%d", (*track[special_position].cyclist1).place); fputs(str, pfile);
+         fputs(" of ", pfile);
+         sprintf(str, "%d", total_cyclists); fputs(str, pfile); 
+         fputs(".\n", pfile);
+
+         fputs("Cyclist #", pfile);
+         sprintf(str, "%d", (*track[special_position].cyclist2).number); fputs(str, pfile);
+         fputs(" has terminated this lap in position ", pfile);
+         sprintf(str, "%d", (*track[special_position].cyclist2).place); fputs(str, pfile);
+         fputs(" of ", pfile);
+         sprintf(str, "%d", total_cyclists); fputs(str, pfile); 
+         fputs(".\n", pfile);
+
+         fputs("Cyclist #", pfile);
+         sprintf(str, "%d", (*track[special_position].cyclist3).number); fputs(str, pfile);
+         fputs(" has terminated this lap in position ", pfile);
+         sprintf(str, "%d", (*track[special_position].cyclist3).place); fputs(str, pfile);
+         fputs(" of ", pfile);
+         sprintf(str, "%d", total_cyclists); fputs(str, pfile); 
+         fputs(". -> ELIMINATED.\n", pfile);
+
+         track[special_position].cyclist1 = NULL;
+         track[special_position].cyclist2 = NULL;
+         track[special_position].cyclist3 = NULL;
+         track[special_position].cyclists -= 3;  
+      }
+      /*Writes info in the log: broken cyclist*/
+      if(track[special_position].cyclist4 != NULL)
+      {
+         fputs("KNOCKED OUT IN LAP:", pfile);
+         sprintf(str, "%d", lap); fputs(str, pfile);
+         fputs(" :\n", pfile);
+
+         fputs("Cyclist #", pfile);
+         sprintf(str, "%d", (*track[special_position].cyclist4).number); fputs(str, pfile);
+         fputs(" has been knocked out. His final standing is ", pfile);
+         sprintf(str, "%d", (*track[special_position].cyclist4).place); fputs(str, pfile);
+         fputs(" of ", pfile);
+         sprintf(str, "%d", total_cyclists); fputs(str, pfile); 
+         fputs(". -> BROKEN.\n", pfile);
+
+         track[special_position].cyclist4 = NULL;
+         (track[special_position].cyclists)--;
+      }
+      pthread_mutex_unlock(&track[special_position].meter_lock);
+   }
+
+   for(i = 0; i < total_cyclists; i++)
+   {
+      if(all_cyclists[i].place == 1) order[0] = i;
+      if(all_cyclists[i].place == 2) order[1] = i;
+      if(all_cyclists[i].place == 3) order[2] = i;
+   }
+
+   /*Writes the winners*/
+   fputs("\n\nOMNIUM WINNERS:\n", pfile);
+   fputs("\n1st place: Cyclist #", pfile); sprintf(str, "%d", all_cyclists[order[0]].number); fputs(str, pfile); fputc('.', pfile);
+   fputs("\n2nd place: Cyclist #", pfile); sprintf(str, "%d", all_cyclists[order[1]].number); fputs(str, pfile); fputc('.', pfile);
+   fputs("\n3rd place: Cyclist #", pfile); sprintf(str, "%d", all_cyclists[order[2]].number); fputs(str, pfile); fputc('.', pfile);
+
+   fclose(pfile);
+
+   return NULL;
+}
+
 
 /*Function to wait x ms.*/
 void await(int x)
@@ -514,8 +678,9 @@ void countdown()
 void make_track()
 {
    int i;
-   track = malloc(track_size * sizeof(Meter));
-   for(i = 0; i < track_size; i++)
+   track = malloc((track_size + 1) * sizeof(Meter));
+   /*Note: the last position of track is used ONLY by the logger. It is not a real meter. Is just contains information to write the output*/
+   for(i = 0; i <= track_size; i++)
    {
       track[i].cyclist1 = NULL;
       track[i].cyclist2 = NULL;
@@ -613,6 +778,16 @@ void join_time_thread(pthread_t time_thread)
   if (pthread_join(time_thread, NULL)) 
   {
       printf("Error joining time thread.");
+      abort();
+  }
+}
+
+/*Function to join the log thread*/
+void join_log_thread(pthread_t log_thread)
+{
+  if (pthread_join(log_thread, NULL)) 
+  {
+      printf("Error joining log thread.");
       abort();
   }
 }
@@ -721,7 +896,7 @@ void update_places(Cyclist *all_cyclists)
 void destroy_locks_and_semaphores()
 {
    int i = 0;
-   for(i = 0; i < track_size; i++)
+   for(i = 0; i <= track_size; i++)
    {
       pthread_mutex_destroy(&track[i].meter_lock);
       sem_destroy(&track[i].mutex);

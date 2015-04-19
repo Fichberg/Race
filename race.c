@@ -333,11 +333,11 @@ void eliminate_cyclist(Cyclist *cyclist, int new_position)
    if((new_position == 0) && (cyclist->place == cyclists_competing))
    {
       pthread_mutex_lock(&elimination_lock);
-      if(already_eliminated == 0)
-      {
-         already_eliminated = 1;
-         mark_cyclist(cyclist, 'E');
-      }
+         if(already_eliminated == 0)
+         {
+            already_eliminated = 1;
+            mark_cyclist(cyclist, 'E');
+         }
       pthread_mutex_unlock(&elimination_lock);
    }
 }
@@ -516,6 +516,8 @@ void *omnium_logger(void *args)
       /*Writes info in the log: eliminated cyclists and the remaining last 2 cyclists. Also, writed next lap info.*/
       if(track[special_position].cyclist1 != NULL && track[special_position].cyclist2 != NULL && track[special_position].cyclist3 != NULL)
       {
+         int eliminated_place = (*track[special_position].cyclist3).place; 
+
          fputs("LOSERS OF LAP ", pfile);
          sprintf(str, "%d", lap++); fputs(str, pfile);
          fputs(":\n", pfile);
@@ -523,7 +525,7 @@ void *omnium_logger(void *args)
          fputs("Cyclist #", pfile);
          sprintf(str, "%d", (*track[special_position].cyclist1).number); fputs(str, pfile);
          fputs(" has terminated this lap in position ", pfile);
-         sprintf(str, "%d", (*track[special_position].cyclist1).place); fputs(str, pfile);
+         sprintf(str, "%d", eliminated_place - 2); fputs(str, pfile);
          fputs(" of ", pfile);
          sprintf(str, "%d", total_cyclists); fputs(str, pfile); 
          fputs(".\n", pfile);
@@ -531,7 +533,7 @@ void *omnium_logger(void *args)
          fputs("Cyclist #", pfile);
          sprintf(str, "%d", (*track[special_position].cyclist2).number); fputs(str, pfile);
          fputs(" has terminated this lap in position ", pfile);
-         sprintf(str, "%d", (*track[special_position].cyclist2).place); fputs(str, pfile);
+         sprintf(str, "%d", eliminated_place - 1); fputs(str, pfile);
          fputs(" of ", pfile);
          sprintf(str, "%d", total_cyclists); fputs(str, pfile); 
          fputs(".\n", pfile);
@@ -539,7 +541,7 @@ void *omnium_logger(void *args)
          fputs("Cyclist #", pfile);
          sprintf(str, "%d", (*track[special_position].cyclist3).number); fputs(str, pfile);
          fputs(" has terminated this lap in position ", pfile);
-         sprintf(str, "%d", (*track[special_position].cyclist3).place); fputs(str, pfile);
+         sprintf(str, "%d", eliminated_place); fputs(str, pfile);
          fputs(" of ", pfile);
          sprintf(str, "%d", total_cyclists); fputs(str, pfile); 
          fputs(". -> ELIMINATED.\n", pfile);

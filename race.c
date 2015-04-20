@@ -346,7 +346,6 @@ void mark_cyclist(Cyclist *cyclist, char mark)
    /*Marks the cyclists to eliminate him later*/
    if(mark == 'E') cyclist->eliminated = 'Y';
    else /*mark == 'B'*/ cyclist->broken = 'Y';
-   /*cyclist->cyclist_timer = clock() - start;*/
 }
 
 /*Checks is the cyclist in this position will complete a new lap*/
@@ -383,8 +382,6 @@ void write_cyclist(Cyclist *cyclist, int new_position)
    }
    /*Assigns the new position to the cyclist*/
    cyclist->position = new_position;
-   /*Assigns the time he did the movement*/
-   /*cyclist->cyclist_timer = clock() - start;*/
 }
 
 /*Erases the cyclists from his old track position*/

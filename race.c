@@ -490,8 +490,7 @@ void *omnium_chronometer(void *args)
       /*DEBUG MODE*/
       if(mode == 'U' || mode == 'V') 
       { 
-         print_cyclists(all_cyclists); 
-         if(cycles % 20 == 0) cycles = 0; 
+         if(cycles % 20 == 0) { cycles = 0; print_cyclists(all_cyclists); }  
          cycles++;
       }
    }

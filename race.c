@@ -25,7 +25,7 @@ typedef struct cyclist {
    int lap;                   /*His actual lap*/
    char eliminated;           /*is he eliminated?*/
    char broken;               /*did he broke?*/
-   unsigned int race_cycles;    /*Elimination, broken or victory time*/
+   clock_t cyclist_timer;     /*Elimination, broken or victory time*/
    float half;                /*Stores extra position for speed = 25*/
 } Cyclist;
 
@@ -47,8 +47,8 @@ typedef Meter* Track;
 cyclists_competing stores the number of cyclists still running (i.e not broken and not eliminated). 
 total_cyclists stores the total number of cyclists, passed through command line*/
 int cyclists_competing, total_cyclists;
-/*Global variable related to time. Contains the race time duration (cycles * 0.72)ms*/
-unsigned int cycles;
+/*Global variable related to time. Contains the race time duration*/
+clock_t start_timer;
 /*Global variables related to the track. 
 track represents the track (an array of struct meter)
 track_size contains the size of the track. It goes from [0...track_size-1]*/
@@ -104,6 +104,7 @@ char get_mode(char **);
 void destroy_locks_and_semaphores();
 void write_log_elimination_info(Cyclist*);
 void write_log_break_info(Cyclist *cyclist);
+void update_timers(Cyclist*);
 
 int main(int argc, char **argv)
 {
@@ -132,9 +133,6 @@ int main(int argc, char **argv)
 
    /*Sets go to false. Cyclists can't start unless go is true*/
    go = 0;
-
-   /*Race chronometer*/
-   cycles = 0;
 
    /*Sets the size of the track*/
    /*Multiplied by 2 because cyclist can move 0.5m when they are with a speed of 25km/h*/
@@ -348,7 +346,7 @@ void mark_cyclist(Cyclist *cyclist, char mark)
    /*Marks the cyclists to eliminate him later*/
    if(mark == 'E') cyclist->eliminated = 'Y';
    else /*mark == 'B'*/ cyclist->broken = 'Y';
-   cyclist->race_cycles = cycles;
+   /*cyclist->cyclist_timer = clock() - start;*/
 }
 
 /*Checks is the cyclist in this position will complete a new lap*/
@@ -386,7 +384,7 @@ void write_cyclist(Cyclist *cyclist, int new_position)
    /*Assigns the new position to the cyclist*/
    cyclist->position = new_position;
    /*Assigns the time he did the movement*/
-   cyclist->race_cycles = cycles;
+   /*cyclist->cyclist_timer = clock() - start;*/
 }
 
 /*Erases the cyclists from his old track position*/
@@ -432,12 +430,13 @@ int disqualified(Cyclist *cyclist)
 /*Broadcasts, announcing broken, and eliminated cyclists and the winner of the race*/
 void broadcast(Cyclist *cyclist)
 {
+   int sec = cyclist->cyclist_timer / CLOCKS_PER_SEC;
    if(cyclist->eliminated == 'Y')
-      printf("\n*****************************\nThe cyclist %d (%p) has been ELIMINATED (time: %.2fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_cycles * 0.72 ), cyclist->place);
+      printf("\n*****************************\nThe cyclist %d (%p) has been ELIMINATED (time: %ds). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, sec, cyclist->place);
    else if(cyclist->broken == 'Y')
-      printf("\n*****************************\nThe cyclist %d (%p) has BROKEN (time: %.2fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_cycles * 0.72 ), cyclist->place);
+      printf("\n*****************************\nThe cyclist %d (%p) has BROKEN (time: %ds). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, sec, cyclist->place);
    else
-      printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %.2fms). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, (cyclist->race_cycles * 0.72 ), cyclist->place);
+      printf("\n*****************************\nThe cyclist %d (%p) has WON THE RACE (time: %ds). Place: %d\n*****************************\n", cyclist->number, (void*)cyclist, sec, cyclist->place);
 }
 
 /*Omnium race function. Each thread is representing a cyclist in omnium*/
@@ -458,10 +457,8 @@ void *omnium(void *args)
          sem_post(&track[old_position].mutex);
          old_position = new_position;
       }
-      await(10000000);
-      go = STOP;
-      while(!go) continue;
       if(disqualified(cyclist) == 1) break;
+      await(72000000); /*Each cyclist make a move every 0.72ms. 1m or 0.5m, depending on his speed*/
    }
 
    sem_post(&track[new_position].mutex);
@@ -477,23 +474,30 @@ void *omnium(void *args)
 /*Runs the chronometer. The chronometer also prints on the screen the information about the race.*/
 void *omnium_chronometer(void *args)
 {
+   int cycles = 0;
    Cyclist *all_cyclists = args;
 
    /*Race will start. After countdown(), all cyclist threads will be unlocked.*/
    countdown();
    /*RELEASE THE CYCLISTS!*/
+   /*Race chronometer*/
+   start_timer = clock();
    
    /*Time thread will run until we have just 1 cyclist competing*/
    while(cyclists_competing != 1)
    {
-      /*All cyclists must have moved within this cycle*/
+      /*Simulation timer, counted in cycles of 0.72ms*/
       await(72000000);
       /*Update places in case of a break*/
+      update_timers(all_cyclists);
       if(update == 1) update_places(all_cyclists);
       /*DEBUG MODE*/
-      if((mode == 'U' || mode == 'V') /*&& cycles % 20 == 0*/) print_cyclists(all_cyclists);
-      go = START;
-      cycles++;
+      if(mode == 'U' || mode == 'V') 
+      { 
+         print_cyclists(all_cyclists); 
+         if(cycles % 20 == 0) cycles = 0; 
+         cycles++;
+      }
    }
    return NULL;
 }
@@ -660,7 +664,6 @@ void make_cyclists(Cyclist *thread_args, int *initial_config, int initial_speed,
       thread_args[i].lap = 1; /*first lap*/
       thread_args[i].eliminated = 'N';
       thread_args[i].broken = 'N';
-      thread_args[i].race_cycles = 0;
       thread_args[i].half = 0;
    }
 }
@@ -834,4 +837,10 @@ void destroy_locks_and_semaphores()
       pthread_mutex_destroy(&track[i].meter_lock);
       sem_destroy(&track[i].mutex);
    }
+}
+
+void update_timers(Cyclist *all_cyclists)
+{
+   int i = 0;
+   for(i = 0; i < total_cyclists; i++) all_cyclists[i].cyclist_timer = clock() - start_timer;
 }

@@ -122,7 +122,6 @@ int main(int argc, char **argv)
    if(mode == 'u' || mode == 'U') initial_speed = 50;
    else initial_speed = 25;
 
-
    /*Starting order of the cyclists is in the array initial_config[0...cyclists-1]. Each cyclist is recognized by its unique number*/
    initial_config = initial_configuration(cyclists);
 
@@ -590,7 +589,6 @@ void *omnium_logger(void *args)
 
    return NULL;
 }
-
 
 /*Function to wait x ms.*/
 void await(int x)
